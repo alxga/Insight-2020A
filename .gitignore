@@ -2,3 +2,10 @@ VP/
 Alerts/
 VehiclePos/
 TripUpdates/
+csv-mbta-VehiclePos/
+mbta-VehiclePos/
+MBTA_GTFS/
+__pycache__/
+.vs/
+
+*.pkl
