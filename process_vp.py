@@ -29,7 +29,7 @@ class RowParser:
     return (row[self.ixTimestamp], row[self.ixVid])
 
 
-def read_vp_csv(csvPath):
+def process_vp_csv(csvPath):
   with utils.open_csv_r(csvPath) as f:
     reader = csv.reader(f)
     header = next(reader)
@@ -55,11 +55,13 @@ else:
     csvPath = os.path.join(Settings.CsvVehPos, entry)
     if not os.path.isfile(csvPath):
       continue
-    header = read_vp_csv(csvPath)
     fileCount += 1
-    print("%d: %s" % (fileCount, os.path.split(csvPath)[1]))
-    if len(RowsDict) > 10000:
-      break
+    fileName = os.path.split(csvPath)[1]
+    print("%d: %s" % (fileCount, fileName))
+    try:
+      header = process_vp_csv(csvPath)
+    except StopIteration:
+      pass
 
   with open(pklPath, 'wb') as f:
     pkl.dump((header, RowsDict), f, 2)

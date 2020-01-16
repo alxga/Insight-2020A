@@ -20,6 +20,9 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="collect.py" />
+    <Compile Include="gtfs_shapes_to_shp.py">
+      <SubType>Code</SubType>
+    </Compile>
     <Compile Include="process_vp.py">
       <SubType>Code</SubType>
     </Compile>
