@@ -5,9 +5,9 @@ import requests
 import threading
 
 Feeds = [
-    ("VehiclePos", "https://cdn.mbta.com/realtime/VehiclePositions.pb"),
-    ("TripUpdates", "https://cdn.mbta.com/realtime/TripUpdates.pb"),
-    ("Alerts", "https://cdn.mbta.com/realtime/Alerts.pb")
+    ("VehiclePos", "https://cdn.mbta.com/realtime/VehiclePositions.pb", 1),
+    ("TripUpdates", "https://cdn.mbta.com/realtime/TripUpdates.pb", 60),
+    ("Alerts", "https://cdn.mbta.com/realtime/Alerts.pb", 30)
 ]
 
 PyPath = os.path.dirname(os.path.abspath(__file__))
@@ -17,7 +17,7 @@ for tpl in Feeds:
         os.makedirs(p)
 
 
-def download_feed(dir, url):
+def download_feed(dir, url, *args):
     fName = datetime.now().strftime("%Y%m%d-%H%M%S.pb")
     r = requests.get(url)
     fPath = os.path.join(PyPath, dir, fName)
@@ -29,6 +29,8 @@ threads = []
 for sec in range(0, 59, 5):
     print("Offset %d\n" % sec)
     for tpl in Feeds:
+        if sec % tpl[2] != 0:
+            continue
         t = threading.Thread(target=download_feed, args=tpl)
         t.start()
         threads.append(t)

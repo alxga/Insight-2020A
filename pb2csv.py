@@ -1,8 +1,8 @@
 import os
 import subprocess
 
-pbDataDir = "/home/alxga/data/mbta-VehiclePos"
-csvDataDir = "/home/alxga/data/csv-mbta-VehiclePos"
+pbDataDir = "/home/alxga/data/mbta-TripUpdates"
+csvDataDir = "/home/alxga/data/csv-mbta-TripUpdates"
 gtfsToCsv = "/home/alxga/src/gtfsToCsv/gtfsToCSV"
 gtfsToCsvEnv = { "LD_LIBRARY_PATH": "/usr/local/lib" }
 
