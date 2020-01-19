@@ -4,7 +4,7 @@ import csv
 import unittest
 import utils
 from settings import Settings
-import gtfs
+import gtfsparsers
 
 class TestGtfsStaticCsvParsersMBTA1(unittest.TestCase):
   """Class to test the DataMgr class
@@ -41,7 +41,7 @@ class TestGtfsStaticCsvParsersMBTA1(unittest.TestCase):
     with utils.open_csv_r(os.path.join(Settings.GTFSStaticPath,
                                        "calendar.csv")) as f:
       reader = csv.reader(f)
-      parser = gtfs.CalendarCsvParser(next(reader))
+      parser = gtfsparsers.CalendarCsv(next(reader))
       for row in reader:
         service = parser.parse_row(row)
         ret[service.id] = service
@@ -51,7 +51,7 @@ class TestGtfsStaticCsvParsersMBTA1(unittest.TestCase):
     with utils.open_csv_r(os.path.join(Settings.GTFSStaticPath,
                                        "calendar_dates.csv")) as f:
       reader = csv.reader(f)
-      parser = gtfs.CalendarDatesCsvParser(next(reader), serviceDict)
+      parser = gtfsparsers.CalendarDatesCsv(next(reader), serviceDict)
       for row in reader:
         parser.parse_row(row)
 
@@ -60,11 +60,22 @@ class TestGtfsStaticCsvParsersMBTA1(unittest.TestCase):
     with utils.open_csv_r(os.path.join(Settings.GTFSStaticPath,
                                        "stops.csv")) as f:
       reader = csv.reader(f)
-      parser = gtfs.StopCsvParser(next(reader))
+      parser = gtfsparsers.StopsCsv(next(reader))
       for row in reader:
         stop = parser.parse_row(row)
         ret[stop.id] = stop
     parser.resolve_forward_refs(ret)
+    return ret
+
+  def read_routes_to_dict(self):
+    ret = {}
+    with utils.open_csv_r(os.path.join(Settings.GTFSStaticPath,
+                                       "routes.csv")) as f:
+      reader = csv.reader(f)
+      parser = gtfsparsers.RoutesCsv(next(reader))
+      for row in reader:
+        route = parser.parse_row(row)
+        ret[route.id] = route
     return ret
 
 
@@ -79,6 +90,10 @@ class TestGtfsStaticCsvParsersMBTA1(unittest.TestCase):
   def test_stops_csv_parser(self):
     stopDict = self.read_stops_to_dict()
     self.assertEqual(len(stopDict), 9861)
+
+  def test_route_csv_parser(self):
+    routeDict = self.read_routes_to_dict()
+    self.assertEqual(len(routeDict), 236)
 
 
 if __name__ == '__main__':
