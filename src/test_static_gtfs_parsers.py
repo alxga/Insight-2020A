@@ -55,6 +55,18 @@ class TestGtfsStaticCsvParsersMBTA1(unittest.TestCase):
       for row in reader:
         parser.parse_row(row)
 
+  def read_stops_to_dict(self):
+    ret = {}
+    with utils.open_csv_r(os.path.join(Settings.GTFSStaticPath,
+                                       "stops.csv")) as f:
+      reader = csv.reader(f)
+      parser = gtfs.StopCsvParser(next(reader))
+      for row in reader:
+        stop = parser.parse_row(row)
+        ret[stop.id] = stop
+    parser.resolve_forward_refs(ret)
+    return ret
+
 
   def test_calendar_csv_parser(self):
     serviceDict = self.read_calendar_to_dict()
@@ -63,6 +75,11 @@ class TestGtfsStaticCsvParsersMBTA1(unittest.TestCase):
   def test_calendar_dates_csv_parser(self):
     serviceDict = self.read_calendar_to_dict()
     self.read_calendar_dates(serviceDict)
+
+  def test_stops_csv_parser(self):
+    stopDict = self.read_stops_to_dict()
+    self.assertEqual(len(stopDict), 9861)
+
 
 if __name__ == '__main__':
   unittest.main()
