@@ -9,5 +9,6 @@ __pycache__/
 .vs/
 
 
+.env
 *.pkl
 77.csv

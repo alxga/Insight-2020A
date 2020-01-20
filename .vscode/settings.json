@@ -8,7 +8,9 @@
       "--disable=missing-function-docstring",
       "--disable=missing-module-docstring",
       "--disable=too-few-public-methods",
+      "--disable=too-many-lines",
       "--disable=unused-argument",
+      "--disable=bad-indentation",
       "--indent-string='  '"
     ],
     "python.testing.unittestArgs": [
