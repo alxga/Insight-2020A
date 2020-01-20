@@ -1,5 +1,8 @@
 from enum import Enum
 
+__author__ = "Alex Ganin"
+
+
 class Flags:
   Mon = 1<<0
   Tue = 1<<1
@@ -52,7 +55,7 @@ class Stop:
   def isWheelchairAccessible(self):
     if self.parentStation is None:
       rets = [None, True, False]
-      return rets[self.wheelchairBoarding]
+      return rets[self.wheelchairBoarding] # pylint: disable=invalid-sequence-index
 
     if self.wheelchairBoarding == 0:
       return self.parentStation.isWheelchairAccessible()

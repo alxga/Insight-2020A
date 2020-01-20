@@ -1,9 +1,10 @@
 import dateutil.parser as dtparser
-from appex import AppEx
-import utils
-import geo
-from gtfs import Flags, CalendarService, CalendarServiceException, Stop, \
-                 Route
+from gtfsstatic import AppEx
+from gtfsstatic import utils, geo
+from gtfsstatic.gtfs \
+  import Flags, CalendarService, CalendarServiceException, Stop, Route
+
+__author__ = "Alex Ganin"
 
 
 class CalendarCsv:

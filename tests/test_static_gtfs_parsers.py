@@ -2,9 +2,8 @@ import os
 import shutil
 import csv
 import unittest
-import utils
-from settings import Settings
-import gtfsparsers
+from gtfsstatic import utils, gtfsparsers
+from gtfsstatic import Settings
 
 class TestGtfsStaticCsvParsersMBTA1(unittest.TestCase):
   """Class to test the DataMgr class

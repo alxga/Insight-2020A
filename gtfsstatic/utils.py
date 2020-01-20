@@ -1,10 +1,6 @@
-import sys
-import os
-import csv
-import numpy as np
-from settings import Settings
+from gtfsstatic import Settings
 
-__author__ = "Alex"
+__author__ = "Alex Ganin"
 
 
 def open_csv_r(_file_path):
@@ -34,9 +30,8 @@ def msec(_dt):
   return int(_dt.total_seconds() * 1000 + 0.5)
 
 
-def remove_enclosing_quotes(str):
-  if len(str) >= 2 and str[0] == '\'' and str[-1] == '\'':
-    return str[1:-1]
+def remove_enclosing_quotes(txt):
+  if len(txt) >= 2 and txt[0] == '\'' and txt[-1] == '\'':
+    return txt[1:-1]
   else:
-    return str
-
+    return txt

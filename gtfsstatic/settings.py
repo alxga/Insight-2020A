@@ -1,6 +1,5 @@
 import os
 import sys
-import shutil
 import platform
 
 __author__ = "Alex"
@@ -24,8 +23,6 @@ class Settings:
 
     self.IsCygwin = platform.system()[:6] == "CYGWIN"
     self.PyVersion = sys.version_info[0]
-
-    self.CsvVehPos = os.path.join(self.ProjPath, "csv-mbta-VehiclePos")
 
 
 Settings = Settings()
