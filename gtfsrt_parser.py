@@ -24,7 +24,7 @@ def process_vehicle_pos(pbVal):
   """
 
   tStamp = datetime.fromtimestamp(pbVal.timestamp)
-  tStamp = tStamp.replace(tzinfo=timezone.utc).astimezone(tz=None)
+  # tStamp = tStamp.replace(tzinfo=timezone.utc).astimezone(tz=None)
   tpl = (
     pbVal.trip.route_id, tStamp.strftime('%Y-%m-%d %H:%M:%S'),
     pbVal.vehicle.id, pbVal.trip.trip_id,
@@ -34,10 +34,8 @@ def process_vehicle_pos(pbVal):
 
   cursor.execute(sqlStmt, tpl)
 
-  pass
-
 fileCounter = 0
-for entry in os.listdir(PBDIRPATH):
+for entry in sorted(os.listdir(PBDIRPATH)):
   fileCounter += 1
   print("Processing file %d: %s" % (fileCounter, entry))
 
