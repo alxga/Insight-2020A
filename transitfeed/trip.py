@@ -1,7 +1,5 @@
 #!/usr/bin/python3
 
-# pylint: disable=protected-access
-
 # Copyright (C) 2007 Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +15,7 @@
 # limitations under the License.
 
 # pylint: disable=bad-indentation
+# pylint: disable=protected-access
 
 
 import warnings
@@ -115,29 +114,6 @@ class Trip(GtfsObjectBase):
         )
         cursor = schedule._connection.cursor()
         cursor.execute(insert_query, stoptime.GetSqlValuesTuple(self.trip_id))
-
-    def ReplaceStopTimeObject(self, stoptime, schedule=None):
-        """Replace a StopTime object from this trip with the given one.
-
-        Keys the StopTime object to be replaced by trip_id, stop_sequence
-        and stop_id as 'stoptime', with the object 'stoptime'.
-        """
-
-        if schedule is None:
-            schedule = self._schedule
-
-        new_secs = stoptime.GetTimeSecs()
-        cursor = schedule._connection.cursor()
-        cursor.execute(
-            "DELETE FROM stop_times WHERE trip_id=? and "
-            "stop_sequence=? and stop_id=?",
-            (self.trip_id, stoptime.stop_sequence, stoptime.stop_id),
-        )
-        if cursor.rowcount == 0:
-            raise problems_module.Error(
-                "Attempted replacement of StopTime object which does not exist"
-            )
-        self._AddStopTimeObjectUnordered(stoptime, schedule)
 
     def AddStopTimeObject(self, stoptime, schedule=None, problems=None):
         """Add a StopTime object to the end of this trip.
@@ -405,16 +381,6 @@ class Trip(GtfsObjectBase):
                 "times." % self.trip_id,
             )
 
-    def GetHeadwayStartTimes(self):
-        """Deprecated. Please use GetFrequencyStartTimes instead."""
-        warnings.warn(
-            "No longer supported. The HeadwayPeriod class was renamed to "
-            "Frequency, and all related functions were renamed "
-            "accordingly.",
-            DeprecationWarning,
-        )
-        return self.GetFrequencyStartTimes()
-
     def GetFrequencyStartTimes(self):
         """Return a list of start time for each headway-based run.
 
@@ -491,22 +457,6 @@ class Trip(GtfsObjectBase):
                 frequency.ExactTimes(),
                 problem_reporter,
             )
-
-    def AddHeadwayPeriod(
-        self,
-        start_time,
-        end_time,
-        headway_secs,
-        problem_reporter=problems_module.default_problem_reporter,
-    ):
-        """Deprecated. Please use AddFrequency instead."""
-        warnings.warn(
-            "No longer supported. The HeadwayPeriod class was renamed to "
-            "Frequency, and all related functions were renamed "
-            "accordingly.",
-            DeprecationWarning,
-        )
-        self.AddFrequency(start_time, end_time, headway_secs, problem_reporter)
 
     def AddFrequency(
         self,

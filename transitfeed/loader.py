@@ -1,7 +1,5 @@
 #!/usr/bin/python3
 
-# pylint: disable=protected-access
-
 # Copyright (C) 2007 Google Inc.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -16,6 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# pylint: disable=fixme
+# pylint: disable=protected-access
+# pylint: disable=consider-using-enumerate
+# pylint: disable=redefined-outer-name
+
 
 import codecs
 import csv
@@ -23,6 +26,7 @@ import os
 import re
 import zipfile
 from io import BytesIO
+from collections import defaultdict
 
 from . import gtfsfactoryuser
 from . import problems
@@ -38,7 +42,7 @@ class Loader:
       extra_validation=False,
       load_stop_times=True,
       memory_db=True,
-      zip=None,
+      zipObj=None,
       check_duplicate_trips=False,
       gtfs_factory=None,
   ):
@@ -70,7 +74,7 @@ class Loader:
     self._schedule = schedule
     self._problems = problems
     self._path = feed_path
-    self._zip = zip
+    self._zip = zipObj
     self._load_stop_times = load_stop_times
     self._gtfs_factory = gtfs_factory
 
@@ -181,7 +185,7 @@ class Loader:
     reader = csv.reader(eol_checker, skipinitialspace=True)
 
     raw_header = next(reader)
-    header_occurrences = util.defaultdict(lambda: 0)
+    header_occurrences = defaultdict(lambda: 0)
     header = []
     valid_columns = []  # Index into raw_header and raw_row
     for i, h in enumerate(raw_header):
@@ -336,7 +340,7 @@ class Loader:
 
     header = next(reader)
     header = [x.strip() for x in header]  # trim any whitespace
-    header_occurrences = util.defaultdict(lambda: 0)
+    header_occurrences = defaultdict(lambda: 0)
     for column_header in header:
       header_occurrences[column_header] += 1
 

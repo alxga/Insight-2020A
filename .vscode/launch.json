@@ -15,7 +15,7 @@
             "name": "Python: GTFS Schedule Viewer",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
+            "program": "${workspaceFolder}/schedule_viewer.py",
             "console": "integratedTerminal",
             "args": [
               "~/data/MBTA_GTFS.zip"

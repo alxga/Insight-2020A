@@ -10,5 +10,6 @@ __pycache__/
 
 
 .env
+*.pb
 *.pkl
-77.csv
+gtfs_realtime_pb2.py
