@@ -33,7 +33,7 @@ s3_res = boto3.resource('s3', **_s3ConnArgs)
 bucket = s3_res.Bucket(_s3Bucket)
 
 dag = DAG('Syncs3toDB', default_args=default_args, schedule_interval=timedelta(minutes=1),
-          max_active_runs=1)
+          max_active_runs=1, catchup=False)
 
 def enum_buckets_to_process():
   for obj in bucket.objects.filter(Prefix='pb/VehiclePos'):
