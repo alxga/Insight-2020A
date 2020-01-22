@@ -10,6 +10,9 @@ venv/
 .vs/
 
 
+*.err
+*.out
+*.log
 .env
 *.pb
 *.pkl
