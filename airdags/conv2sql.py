@@ -1,8 +1,8 @@
 import os
+from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 from airflow.operators.dummy_operator import DummyOperator
-from datetime import datetime, timedelta
 from google.protobuf.message import DecodeError
 import boto3
 import gtfs_realtime_pb2
@@ -32,7 +32,8 @@ _s3ConnArgs = {
 s3_res = boto3.resource('s3', **_s3ConnArgs)
 bucket = s3_res.Bucket(_s3Bucket)
 
-dag = DAG('Syncs3toDB', default_args=default_args, schedule_interval=timedelta(minutes=1))
+dag = DAG('Syncs3toDB', default_args=default_args, schedule_interval=timedelta(minutes=1),
+          max_active_runs=1)
 
 def enum_buckets_to_process():
   for obj in bucket.objects.filter(Prefix='pb/VehiclePos'):
