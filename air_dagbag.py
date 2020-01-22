@@ -1,7 +1,7 @@
 """ add additional DAGs folders """
 import os
 from airflow.models import DagBag
-dags_dirs = ['~/src']
+dags_dirs = ['~/src/airdags']
 
 for path in dags_dirs:
   dag_bag = DagBag(os.path.expanduser(path))
