@@ -1,5 +1,10 @@
 {
-    "python.pythonPath": "/usr/bin/python3",
+    "files.watcherExclude": {
+      "**/.git/objects/**": true,
+      "**/.git/subtree-cache/**": true,
+      "**/venv/*/**": true
+    },
+    "python.pythonPath": "/home/alxga/src/awstest/venv/bin/python3.6",
     "python.linting.pylintArgs": [
       "--disable=no-member",
       "--disable=invalid-name",

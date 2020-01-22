@@ -6,6 +6,7 @@ csv-mbta-VehiclePos/
 mbta-VehiclePos/
 MBTA_GTFS/
 __pycache__/
+venv/
 .vs/
 
 

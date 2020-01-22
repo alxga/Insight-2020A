@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timezone
+from datetime import datetime
 from google.protobuf.message import DecodeError
 from dbconn import dbConn
 import gtfs_realtime_pb2
@@ -17,8 +17,8 @@ def process_trip_update(pbVal):
 
 def process_vehicle_pos(pbVal):
   sqlStmt = """
-    INSERT IGNORE into VehPos(
-      RouteId, TimeStamp, VehicleId, TripId, Lat, Lon, Status, StopSeq, StopId
+    INSERT IGNORE into TVehPos(
+      RouteId, TStamp, VehicleId, TripId, Lat, Lon, Status, StopSeq, StopId
     )
     values(%s, %s, %s, %s, %s, %s, %s, %s, %s);
   """
@@ -55,6 +55,7 @@ for entry in sorted(os.listdir(PBDIRPATH)):
     if entity.HasField('vehicle'):
       process_vehicle_pos(entity.vehicle)
 
-dbConn.cnx.commit()
+  dbConn.cnx.commit()
+
 cursor.close()
 dbConn.close()
