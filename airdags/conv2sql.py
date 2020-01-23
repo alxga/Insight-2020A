@@ -1,5 +1,6 @@
+# pylint: disable=unused-import
+
 import os
-import threading
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
@@ -23,43 +24,13 @@ default_args = {
   # 'end_date': datetime(2016, 1, 1),
 }
 
-NUMWRKTH = 8
-
-_sqlCreateTempTable = """
-CREATE TABLE `TempVehPos_%d` (
-  `RouteId` char(50) DEFAULT NULL,
-  `TStamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-  `VehicleId` char(50) NOT NULL,
-  `TripId` char(50) NOT NULL,
-  `Lat` float NOT NULL,
-  `Lon` float NOT NULL,
-  `Status` tinyint(4) DEFAULT NULL,
-  `StopSeq` int(11) DEFAULT NULL,
-  `StopId` char(50) DEFAULT NULL,
-  UNIQUE KEY `unique_timetrip` (`TStamp`,`TripId`));
-"""
-_sqlInsertIntoTempTable = """
-  INSERT IGNORE into TempVehPos_%d(
-    RouteId, TStamp, VehicleId, TripId, Lat, Lon, Status, StopSeq, StopId
-  )
-  values(%%s, %%s, %%s, %%s, %%s, %%s, %%s, %%s, %%s);
-"""
-_sqlMergeIntoMainTable = """
-  INSERT IGNORE into VehPos
-  SELECT * from TempVehPos_%d;
-"""
-_sqlDropTempTable = """
-  DROP TABLE IF EXISTS TempVehPos_%d;
-"""
-
 _s3Bucket = "alxga-insde"
 _s3ConnArgs = {
   "aws_access_key_id": os.environ["AWS_ACCESS_KEY_ID"],
   "aws_secret_access_key": os.environ["AWS_SECRET_ACCESS_KEY"],
   "region_name": os.environ["AWS_REGION_NAME"]
 }
-s3_res = boto3.resource('s3', **_s3ConnArgs)
-bucket = s3_res.Bucket(_s3Bucket)
+_s3Res = boto3.resource('s3', **_s3ConnArgs)
 
 dag = DAG('SyncVehPos_S3toDB', default_args=default_args,
           schedule_interval=timedelta(minutes=30),
@@ -67,10 +38,10 @@ dag = DAG('SyncVehPos_S3toDB', default_args=default_args,
 
 
 def move_key(objKey, nObjKey):
-  s3_res.Object(_s3Bucket, nObjKey).copy_from(
+  _s3Res.Object(_s3Bucket, nObjKey).copy_from(
     CopySource={'Bucket': _s3Bucket, 'Key': objKey}
   )
-  s3_res.Object(_s3Bucket, objKey).delete()
+  _s3Res.Object(_s3Bucket, objKey).delete()
 
 def move_key_to_processed(objKey):
   tkns = objKey.split('/')
@@ -95,111 +66,63 @@ def pb2db_vehicle_pos(pbVal):
     pbVal.current_status, pbVal.current_stop_sequence, pbVal.stop_id
   )
 
-class ObjKeyList:
-  def __init__(self):
-    self.objKeys = []
-    for obj in bucket.objects.filter(Prefix='pb/VehiclePos'):
-      self.objKeys.append(obj.key)
-      if len(self.objKeys) > 15:
-        break
-    self.index = 0
-    self.lock = threading.Lock()
+def save_obj_to_db(dbConn, objKey):
+  sqlStmt = """
+    INSERT IGNORE into VehPos(
+      RouteId, TStamp, VehicleId, TripId, Lat, Lon, Status, StopSeq, StopId
+    )
+    values(%s, %s, %s, %s, %s, %s, %s, %s, %s);
+  """
+  sqlStmtPb = """
+    INSERT IGNORE into VehPosPb(name) values(%s);
+  """
 
-  def next(self):
-    with self.lock:
-      ix = self.index
-      self.index += 1
-    if ix >= len(self.objKeys):
-      return ""
-    return self.objKeys[ix]
+  message = gtfs_realtime_pb2.FeedMessage()
+  obj = _s3Res.Object(_s3Bucket, objKey)
+  body = obj.get()["Body"].read()
+  try:
+    message.ParseFromString(body)
+  except DecodeError:
+    return
 
+  tpls = []
+  for entity in message.entity:
+    # if entity.HasField('alert'):
+    #   process_alert(entity.alert)
+    # if entity.HasField('trip_update'):
+    #   process_trip_update(entity.trip_update)
+    if entity.HasField('vehicle'):
+      tpls.append(pb2db_vehicle_pos(entity.vehicle))
 
-def thread_save_to_temp_table(threadId, task_list):
-  dbConn = DBConn()
-  dbConn.connect()
   cursor = dbConn.cnx.cursor()
-
-  sqlStmt = _sqlDropTempTable % threadId
-  cursor.execute(sqlStmt)
-  cursor.execute(_sqlCreateTempTable % threadId)
-  sqlStmt = _sqlInsertIntoTempTable % threadId
-
-  objKey = task_list.next()
-  while objKey:
-    message = gtfs_realtime_pb2.FeedMessage()
-    obj = s3_res.Object(_s3Bucket, objKey)
-    body = obj.get()["Body"].read()
-    try:
-      message.ParseFromString(body)
-
-      tpls = []
-      for entity in message.entity:
-        # if entity.HasField('alert'):
-        #   process_alert(entity.alert)
-        # if entity.HasField('trip_update'):
-        #   process_trip_update(entity.trip_update)
-        if entity.HasField('vehicle'):
-          tpls.append(pb2db_vehicle_pos(entity.vehicle))
-
-      cursor.executemany(sqlStmt, tpls)
-      dbConn.cnx.commit()
-
-      move_key_to_processed(objKey)
-    except DecodeError:
-      pass
-    objKey = task_list.next()
-
+  cursor.executemany(sqlStmt, tpls)
+  cursor.execute(sqlStmtPb, (objKey,))
+  dbConn.cnx.commit()
   cursor.close()
-  dbConn.close()
-
-
-def thread_move_key_to_indb(threadId, task_list):
-  objKey = task_list.next()
-  while objKey:    
-    move_key_to_processed(objKey)
-    objKey = task_list.next()
 
 
 def process_all_objs():
-  objKeyList = ObjKeyList()
-  threads = []
-  for threadId in range(NUMWRKTH):
-    x = threading.Thread(
-      target=thread_save_to_temp_table, args=(threadId, objKeyList)
-    )
-    threads.append(x)
-    x.start()
-
-  for th in threads:
-    th.join()
-
   dbConn = DBConn()
   dbConn.connect()
-  cursor = dbConn.cnx.cursor()
-  for threadId in range(NUMWRKTH):
-    sqlStmt = _sqlMergeIntoMainTable % threadId
-    cursor.execute(sqlStmt)
-    sqlStmt = _sqlDropTempTable % threadId
-    cursor.execute(sqlStmt)
-    dbConn.cnx.commit()
-  cursor.close()
+
+  objKeys = []
+  bucket = _s3Res.Bucket(_s3Bucket)
+  for obj in bucket.objects.filter(Prefix='pb/VehiclePos'):
+    objKeys.append(obj.key)
+    if len(objKeys) > 15:
+      break
+
+  for objKey in objKeys:
+    save_obj_to_db(dbConn, objKey)
+
   dbConn.close()
 
-  objKeyList.index = 0
-  threads = []
-  for threadId in range(NUMWRKTH):
-    x = threading.Thread(
-      target=thread_move_key_to_indb, args=(threadId, objKeyList)
-    )
-    threads.append(x)
-    x.start()
 
-  for th in threads:
-    th.join()
 
 process_all_objs()
-task = PythonOperator(
-    task_id='process_all_objs',
-    python_callable=process_all_objs,
-    dag=dag
-)
+
+#task = PythonOperator(
+#    task_id='process_all_objs',
+#    python_callable=process_all_objs,
+#    dag=dag
+#)
