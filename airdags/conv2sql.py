@@ -11,7 +11,7 @@ from dbconn import DBConn
 default_args = {
   'owner': 'Airflow',
   'depends_on_past': False,
-  'start_date': datetime(2020, 1, 31),
+  'start_date': datetime(2020, 1, 1),
   'email': ['alexander_a_g@outlook.com'],
   'email_on_failure': False,
   'email_on_retry': False,
@@ -49,7 +49,7 @@ _sqlMergeIntoMainTable = """
   SELECT * from TempVehPos_%d;
 """
 _sqlDropTempTable = """
-  DROP TABLE TempVehPos_%d;
+  DROP TABLE IF EXISTS TempVehPos_%d;
 """
 
 _s3Bucket = "alxga-insde"
@@ -62,7 +62,7 @@ s3_res = boto3.resource('s3', **_s3ConnArgs)
 bucket = s3_res.Bucket(_s3Bucket)
 
 dag = DAG('SyncVehPos_S3toDB', default_args=default_args,
-          schedule_interval=timedelta(minutes=1),
+          schedule_interval=timedelta(minutes=30),
           max_active_runs=1, catchup=False)
 
 def enum_buckets_to_process():
@@ -98,6 +98,14 @@ class ObjKeyList:
       return ""
     return self.objKeys[ix]
 
+def move_key_to_processed(objKey):
+  tkns = objKey.split('/')
+  tkns[1] = "indb-" + tkns[1]
+  nObjKey = '/'.join(tkns)
+  s3_res.Object(_s3Bucket, nObjKey).copy_from(
+    CopySource={'Bucket': _s3Bucket, 'Key': objKey}
+  )
+  s3_res.Object(_s3Bucket, objKey).delete()
 
 def thread_func(threadId, task_list):
   dbConn = DBConn()
@@ -128,6 +136,8 @@ def thread_func(threadId, task_list):
 
       cursor.executemany(sqlStmt, tpls)
       dbConn.cnx.commit()
+
+      move_key_to_processed(objKey)
     except DecodeError:
       pass
     objKey = task_list.next()
@@ -135,7 +145,6 @@ def thread_func(threadId, task_list):
   cursor.close()
   dbConn.close()
   return 0
-
 
 
 def process_all_objs():
@@ -160,6 +169,7 @@ def process_all_objs():
     dbConn.cnx.commit()
   cursor.close()
   dbConn.close()
+
 
 task = PythonOperator(
     task_id='process_all_objs',
