@@ -109,15 +109,12 @@ def process_all_objs():
   bucket = _s3Res.Bucket(_s3Bucket)
   for obj in bucket.objects.filter(Prefix='pb/VehiclePos'):
     objKeys.append(obj.key)
-    if len(objKeys) > 15:
-      break
 
   for objKey in objKeys:
     save_obj_to_db(dbConn, objKey)
+    print("Processed %s" % objKey)
 
   dbConn.close()
-
-
 
 process_all_objs()
 
@@ -126,3 +123,4 @@ process_all_objs()
 #    python_callable=process_all_objs,
 #    dag=dag
 #)
+
