@@ -1,17 +1,17 @@
 import os
+import threading
 from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
-from airflow.operators.dummy_operator import DummyOperator
 from google.protobuf.message import DecodeError
 import boto3
 import gtfs_realtime_pb2
-from dbconn import dbConn
+from dbconn import DBConn
 
 default_args = {
   'owner': 'Airflow',
   'depends_on_past': False,
-  'start_date': datetime(2015, 6, 1),
+  'start_date': datetime(2020, 1, 31),
   'email': ['alexander_a_g@outlook.com'],
   'email_on_failure': False,
   'email_on_retry': False,
@@ -23,6 +23,35 @@ default_args = {
   # 'end_date': datetime(2016, 1, 1),
 }
 
+NUMWRKTH = 8
+
+_sqlCreateTempTable = """
+CREATE TABLE `TempVehPos_%d` (
+  `RouteId` char(50) DEFAULT NULL,
+  `TStamp` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  `VehicleId` char(50) NOT NULL,
+  `TripId` char(50) NOT NULL,
+  `Lat` float NOT NULL,
+  `Lon` float NOT NULL,
+  `Status` tinyint(4) DEFAULT NULL,
+  `StopSeq` int(11) DEFAULT NULL,
+  `StopId` char(50) DEFAULT NULL,
+  UNIQUE KEY `unique_timetrip` (`TStamp`,`TripId`));
+"""
+_sqlInsertIntoTempTable = """
+  INSERT IGNORE into TempVehPos_%d(
+    RouteId, TStamp, VehicleId, TripId, Lat, Lon, Status, StopSeq, StopId
+  )
+  values(%%s, %%s, %%s, %%s, %%s, %%s, %%s, %%s, %%s);
+"""
+_sqlMergeIntoMainTable = """
+  INSERT IGNORE into VehPos
+  SELECT * from TempVehPos_%d;
+"""
+_sqlDropTempTable = """
+  DROP TABLE TempVehPos_%d;
+"""
+
 _s3Bucket = "alxga-insde"
 _s3ConnArgs = {
   "aws_access_key_id": os.environ["AWS_ACCESS_KEY_ID"],
@@ -32,7 +61,8 @@ _s3ConnArgs = {
 s3_res = boto3.resource('s3', **_s3ConnArgs)
 bucket = s3_res.Bucket(_s3Bucket)
 
-dag = DAG('Syncs3toDB', default_args=default_args, schedule_interval=timedelta(minutes=1),
+dag = DAG('SyncVehPos_S3toDB', default_args=default_args,
+          schedule_interval=timedelta(minutes=1),
           max_active_runs=1, catchup=False)
 
 def enum_buckets_to_process():
@@ -49,59 +79,90 @@ def pb2db_vehicle_pos(pbVal):
     pbVal.current_status, pbVal.current_stop_sequence, pbVal.stop_id
   )
 
-def process_object(objKey):
-  sqlStmt = """INSERT into testair(s) values(%s);"""
+
+class ObjKeyList:
+  def __init__(self):
+    self.objKeys = []
+    for key in enum_buckets_to_process():
+      self.objKeys.append(key)
+      if len(self.objKeys) > 16:
+        break
+    self.index = 0
+    self.lock = threading.Lock()
+
+  def next(self):
+    with self.lock:
+      ix = self.index
+      self.index += 1
+    if ix >= len(self.objKeys):
+      return ""
+    return self.objKeys[ix]
+
+
+def thread_func(threadId, task_list):
+  dbConn = DBConn()
   dbConn.connect()
   cursor = dbConn.cnx.cursor()
-  cursor.execute(sqlStmt, (objKey,))
-  dbConn.cnx.commit()
+
+  sqlStmt = _sqlDropTempTable % threadId
+  cursor.execute(sqlStmt)
+  cursor.execute(_sqlCreateTempTable % threadId)
+  sqlStmt = _sqlInsertIntoTempTable % threadId
+
+  objKey = task_list.next()
+  while objKey:
+    message = gtfs_realtime_pb2.FeedMessage()
+    obj = s3_res.Object(_s3Bucket, objKey)
+    body = obj.get()["Body"].read()
+    try:
+      message.ParseFromString(body)
+
+      tpls = []
+      for entity in message.entity:
+        # if entity.HasField('alert'):
+        #   process_alert(entity.alert)
+        # if entity.HasField('trip_update'):
+        #   process_trip_update(entity.trip_update)
+        if entity.HasField('vehicle'):
+          tpls.append(pb2db_vehicle_pos(entity.vehicle))
+
+      cursor.executemany(sqlStmt, tpls)
+      dbConn.cnx.commit()
+    except DecodeError:
+      pass
+    objKey = task_list.next()
+
   cursor.close()
   dbConn.close()
-  return
+  return 0
 
-  message = gtfs_realtime_pb2.FeedMessage()
-  obj = s3_res.Object(_s3Bucket, objKey)
-  body = obj.get()["Body"].read()
-  try:
-    message.ParseFromString(body)
-  except DecodeError:
-    return
 
-  sqlStmt = """
-    INSERT IGNORE into TVehPos(
-      RouteId, TStamp, VehicleId, TripId, Lat, Lon, Status, StopSeq, StopId
-    )
-    values(%s, %s, %s, %s, %s, %s, %s, %s, %s);
-  """
-  tpls = []
-  for entity in message.entity:
-    # if entity.HasField('alert'):
-    #   process_alert(entity.alert)
-    # if entity.HasField('trip_update'):
-    #   process_trip_update(entity.trip_update)
-    if entity.HasField('vehicle'):
-      tpls.append(pb2db_vehicle_pos(entity.vehicle))
 
+def process_all_objs():
+  objKeyList = ObjKeyList()
+  threads = []
+  for threadId in range(NUMWRKTH):
+    x = threading.Thread(target=thread_func, args=(threadId, objKeyList))
+    threads.append(x)
+    x.start()
+
+  for th in threads:
+    th.join()
+
+  dbConn = DBConn()
   dbConn.connect()
   cursor = dbConn.cnx.cursor()
-  cursor.executemany(sqlStmt, tpls)
-  dbConn.cnx.commit()
+  for threadId in range(NUMWRKTH):
+    sqlStmt = _sqlMergeIntoMainTable % threadId
+    cursor.execute(sqlStmt)
+    sqlStmt = _sqlDropTempTable % threadId
+    cursor.execute(sqlStmt)
+    dbConn.cnx.commit()
   cursor.close()
   dbConn.close()
 
-
-starter = DummyOperator(task_id='starter_vehpos2sql', dag=dag)
-finisher = DummyOperator(task_id='finisher_vehpos2sql', dag=dag)
-count = 0
-for ObjKey in enum_buckets_to_process():
-  task = PythonOperator(
-      task_id='process_' + ObjKey.replace('/', '-'),
-      python_callable=process_object,
-      op_kwargs={'objKey': ObjKey},
-      dag=dag,
-  )
-  task.set_upstream(starter)
-  task.set_downstream(finisher)
-  count += 1
-  if count > 100:
-    break
+task = PythonOperator(
+    task_id='process_all_objs',
+    python_callable=process_all_objs,
+    dag=dag,
+)
