@@ -81,8 +81,11 @@ def move_key_to_processed(objKey):
 def move_key_from_processed(objKey):
   tkns = objKey.split('/')
   tkns[1] = tkns[1][5:]
-  nObjKey = '/'.join(tkns)  
+  nObjKey = '/'.join(tkns)
   move_key(objKey, nObjKey)
+
+for obj in bucket.objects.filter(Prefix='pb/indb-VehiclePos'):
+  move_key_from_processed(obj.key)
 
 
 def pb2db_vehicle_pos(pbVal):
@@ -176,9 +179,9 @@ def process_all_objs():
   cursor.close()
   dbConn.close()
 
-
+process_all_objs()
 task = PythonOperator(
     task_id='process_all_objs',
     python_callable=process_all_objs,
-    dag=dag,
+    dag=dag
 )
