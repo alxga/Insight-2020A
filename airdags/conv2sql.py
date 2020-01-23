@@ -100,7 +100,7 @@ class ObjKeyList:
     self.objKeys = []
     for obj in bucket.objects.filter(Prefix='pb/VehiclePos'):
       self.objKeys.append(obj.key)
-      if len(self.objKeys) > 1000:
+      if len(self.objKeys) > 5000:
         break
     self.index = 0
     self.lock = threading.Lock()
