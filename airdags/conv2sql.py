@@ -84,9 +84,6 @@ def move_key_from_processed(objKey):
   nObjKey = '/'.join(tkns)
   move_key(objKey, nObjKey)
 
-for obj in bucket.objects.filter(Prefix='pb/indb-VehiclePos'):
-  move_key_from_processed(obj.key)
-
 
 def pb2db_vehicle_pos(pbVal):
   tStamp = datetime.fromtimestamp(pbVal.timestamp)
@@ -103,7 +100,7 @@ class ObjKeyList:
     self.objKeys = []
     for obj in bucket.objects.filter(Prefix='pb/VehiclePos'):
       self.objKeys.append(obj.key)
-      if len(self.objKeys) > 5000:
+      if len(self.objKeys) > 15:
         break
     self.index = 0
     self.lock = threading.Lock()
@@ -116,7 +113,8 @@ class ObjKeyList:
       return ""
     return self.objKeys[ix]
 
-def thread_func(threadId, task_list):
+
+def thread_save_to_temp_table(threadId, task_list):
   dbConn = DBConn()
   dbConn.connect()
   cursor = dbConn.cnx.cursor()
@@ -153,14 +151,22 @@ def thread_func(threadId, task_list):
 
   cursor.close()
   dbConn.close()
-  return 0
+
+
+def thread_move_key_to_indb(threadId, task_list):
+  objKey = task_list.next()
+  while objKey:    
+    move_key_to_processed(objKey)
+    objKey = task_list.next()
 
 
 def process_all_objs():
   objKeyList = ObjKeyList()
   threads = []
   for threadId in range(NUMWRKTH):
-    x = threading.Thread(target=thread_func, args=(threadId, objKeyList))
+    x = threading.Thread(
+      target=thread_save_to_temp_table, args=(threadId, objKeyList)
+    )
     threads.append(x)
     x.start()
 
@@ -178,6 +184,18 @@ def process_all_objs():
     dbConn.cnx.commit()
   cursor.close()
   dbConn.close()
+
+  objKeyList.index = 0
+  threads = []
+  for threadId in range(NUMWRKTH):
+    x = threading.Thread(
+      target=thread_move_key_to_indb, args=(threadId, objKeyList)
+    )
+    threads.append(x)
+    x.start()
+
+  for th in threads:
+    th.join()
 
 process_all_objs()
 task = PythonOperator(
