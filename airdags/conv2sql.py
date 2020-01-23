@@ -65,9 +65,25 @@ dag = DAG('SyncVehPos_S3toDB', default_args=default_args,
           schedule_interval=timedelta(minutes=30),
           max_active_runs=1, catchup=False)
 
-def enum_buckets_to_process():
-  for obj in bucket.objects.filter(Prefix='pb/VehiclePos'):
-    yield obj.key
+
+def move_key(objKey, nObjKey):
+  s3_res.Object(_s3Bucket, nObjKey).copy_from(
+    CopySource={'Bucket': _s3Bucket, 'Key': objKey}
+  )
+  s3_res.Object(_s3Bucket, objKey).delete()
+
+def move_key_to_processed(objKey):
+  tkns = objKey.split('/')
+  tkns[1] = "indb-" + tkns[1]
+  nObjKey = '/'.join(tkns)
+  move_key(objKey, nObjKey)
+
+def move_key_from_processed(objKey):
+  tkns = objKey.split('/')
+  tkns[1] = tkns[1][5:]
+  nObjKey = '/'.join(tkns)  
+  move_key(objKey, nObjKey)
+
 
 def pb2db_vehicle_pos(pbVal):
   tStamp = datetime.fromtimestamp(pbVal.timestamp)
@@ -79,13 +95,12 @@ def pb2db_vehicle_pos(pbVal):
     pbVal.current_status, pbVal.current_stop_sequence, pbVal.stop_id
   )
 
-
 class ObjKeyList:
   def __init__(self):
     self.objKeys = []
-    for key in enum_buckets_to_process():
-      self.objKeys.append(key)
-      if len(self.objKeys) > 16:
+    for obj in bucket.objects.filter(Prefix='pb/VehiclePos'):
+      self.objKeys.append(obj.key)
+      if len(self.objKeys) > 1000:
         break
     self.index = 0
     self.lock = threading.Lock()
@@ -97,15 +112,6 @@ class ObjKeyList:
     if ix >= len(self.objKeys):
       return ""
     return self.objKeys[ix]
-
-def move_key_to_processed(objKey):
-  tkns = objKey.split('/')
-  tkns[1] = "indb-" + tkns[1]
-  nObjKey = '/'.join(tkns)
-  s3_res.Object(_s3Bucket, nObjKey).copy_from(
-    CopySource={'Bucket': _s3Bucket, 'Key': objKey}
-  )
-  s3_res.Object(_s3Bucket, objKey).delete()
 
 def thread_func(threadId, task_list):
   dbConn = DBConn()
