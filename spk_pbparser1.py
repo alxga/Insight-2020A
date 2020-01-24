@@ -75,11 +75,10 @@ if __name__ == "__main__":
   file_list = spark.sparkContext.parallelize(keys)
   counts = file_list \
     .flatMap(lambda x: fetch_tpls(x, _s3ConnArgs)) \
-    .map(lambda x: (x[1], 1)) \
-    .reduceByKey(add)
+    #.map(lambda x: ((x[1], x[3]), x)) \
+    #.reduceByKey(lambda x, y: x)
 
   output = counts.collect()
-  for (word, count) in output:
-    print("%s: %i" % (word, count))
+  print("TOTAL LENGTH IS %d" % len(output))
 
   spark.stop()
