@@ -5,6 +5,7 @@ import pyspark
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
 import boto3
+import gtfs_realtime_pb2
 
 _s3Bucket = "alxga-insde"
 _s3Res = boto3.resource('s3')
@@ -19,6 +20,8 @@ def fetch_keys():
       break
   return objKeys
 
+
+
 if __name__ == "__main__":
   spark = SparkSession\
       .builder\
@@ -26,6 +29,8 @@ if __name__ == "__main__":
       .getOrCreate()
 
   keys = fetch_keys()
+  file_list = spark.sparkContext.parallelize(keys)
+  
   lines = lines.rdd.map(lambda r: r[0])
   counts = lines.flatMap(lambda x: x.split(' ')) \
                 .map(lambda x: (x, 1)) \
