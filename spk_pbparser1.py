@@ -1,33 +1,19 @@
 # pylint: disable=unused-import
 
-import sys
-sys.path.insert(0, 'mysparkreqs.zip')
-
 import os
-from operator import add
+import sys
 from datetime import datetime, timedelta
-
 import pyspark
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
+
 import mysql.connector
 import boto3
 from google.protobuf.message import DecodeError
 import gtfs_realtime_pb2
+from common.credentials import S3ConnArgs, MySQLConnArgs
 from queries import Queries
 
-
-_s3ConnArgs = {
-  "aws_access_key_id": os.environ["AWS_ACCESS_KEY_ID"],
-  "aws_secret_access_key": os.environ["AWS_SECRET_ACCESS_KEY"],
-  "region_name": os.environ["AWS_DEFAULT_REGION"]
-}
-_mysqlConnArgs = {
-  "user": os.environ['MYSQL_USER'],
-  "password": os.environ['MYSQL_PWD'],
-  "host": os.environ['MYSQL_HOST'],
-  "database": os.environ['MYSQL_DBNAME']
-}
 
 def fetch_keys():
   s3Bucket = "alxga-insde"
@@ -103,7 +89,6 @@ def push_vehpospb_db(tpls, mysqlConnArgs):
       cursor.close()
     if cnx:
       cnx.close()
-  
 
 
 if __name__ == "__main__":
@@ -116,12 +101,12 @@ if __name__ == "__main__":
   keys = fetch_keys()
   file_list = spark.sparkContext.parallelize(keys)
   counts = file_list \
-    .flatMap(lambda x: [(x, fetch_tpls(x, _s3ConnArgs))]) \
+    .flatMap(lambda x: [(x, fetch_tpls(x, S3ConnArgs))]) \
     .map(vehpospb_row) \
-    .foreachPartition(lambda x: push_vehpospb_db(x, _mysqlConnArgs))
+    #.foreachPartition(lambda x: push_vehpospb_db(x, MySQLConnArgs))
 
-  #output = counts.collect()
-  #for o in output:
-  #  print(str(o))
+  output = counts.collect()
+  for o in output:
+    print(str(o))
 
   spark.stop()

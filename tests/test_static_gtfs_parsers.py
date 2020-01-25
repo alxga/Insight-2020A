@@ -2,8 +2,9 @@ import os
 import shutil
 import csv
 import unittest
-from gtfsstatic import utils, gtfsparsers
-from gtfsstatic import Settings
+from common import utils, Settings
+from gtfsstatic import gtfsparsers
+
 
 class TestGtfsStaticCsvParsersMBTA1(unittest.TestCase):
   """Class to test the DataMgr class
@@ -26,8 +27,7 @@ class TestGtfsStaticCsvParsersMBTA1(unittest.TestCase):
     gtfsStaticPath = os.path.join(cls.TempDir, "gtfs_static")
     shutil.copytree(cls.TestsRootDir, gtfsStaticPath)
 
-    Settings.GTFSStaticPath = gtfsStaticPath
-
+    cls.GTFSStaticPath = gtfsStaticPath
 
   @classmethod
   def tearDownClass(cls):
@@ -37,7 +37,7 @@ class TestGtfsStaticCsvParsersMBTA1(unittest.TestCase):
 
   def read_calendar_to_dict(self):
     ret = {}
-    with utils.open_csv_r(os.path.join(Settings.GTFSStaticPath,
+    with utils.open_csv_r(os.path.join(self.__class__.GTFSStaticPath,
                                        "calendar.csv")) as f:
       reader = csv.reader(f)
       parser = gtfsparsers.CalendarCsv(next(reader))
@@ -47,7 +47,7 @@ class TestGtfsStaticCsvParsersMBTA1(unittest.TestCase):
     return ret
 
   def read_calendar_dates(self, serviceDict):
-    with utils.open_csv_r(os.path.join(Settings.GTFSStaticPath,
+    with utils.open_csv_r(os.path.join(self.__class__.GTFSStaticPath,
                                        "calendar_dates.csv")) as f:
       reader = csv.reader(f)
       parser = gtfsparsers.CalendarDatesCsv(next(reader), serviceDict)
@@ -56,7 +56,7 @@ class TestGtfsStaticCsvParsersMBTA1(unittest.TestCase):
 
   def read_stops_to_dict(self):
     ret = {}
-    with utils.open_csv_r(os.path.join(Settings.GTFSStaticPath,
+    with utils.open_csv_r(os.path.join(self.__class__.GTFSStaticPath,
                                        "stops.csv")) as f:
       reader = csv.reader(f)
       parser = gtfsparsers.StopsCsv(next(reader))
@@ -68,7 +68,7 @@ class TestGtfsStaticCsvParsersMBTA1(unittest.TestCase):
 
   def read_routes_to_dict(self):
     ret = {}
-    with utils.open_csv_r(os.path.join(Settings.GTFSStaticPath,
+    with utils.open_csv_r(os.path.join(self.__class__.GTFSStaticPath,
                                        "routes.csv")) as f:
       reader = csv.reader(f)
       parser = gtfsparsers.RoutesCsv(next(reader))

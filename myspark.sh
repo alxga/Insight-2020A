@@ -7,6 +7,7 @@ LAUNCH_PYSCRIPT="$1"
 shift
 
 onMaster=false
+extraArgs=""
 while [ $# -ne 0 ]
 do
     arg="$1"
@@ -15,7 +16,7 @@ do
             onMaster=true
             ;;
         *)
-            nothing="true"
+            extraArgs="${extraArgs} $arg"
             ;;
     esac
     shift
@@ -37,5 +38,5 @@ if [ "$onMaster" = "true" ] ; then
   args="${args} --master spark://${SPARKM}:7077"
 fi
 echo $args
-spark-submit $args "$LAUNCH_PYSCRIPT"
+spark-submit $args $extraArgs "$LAUNCH_PYSCRIPT"
 

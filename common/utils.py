@@ -1,4 +1,4 @@
-from gtfsstatic import Settings
+from . import Settings
 
 __author__ = "Alex Ganin"
 

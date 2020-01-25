@@ -1,6 +1,6 @@
 import dateutil.parser as dtparser
-from gtfsstatic import AppEx
-from gtfsstatic import utils, geo
+from common import AppEx, utils
+from gtfsstatic import geo
 from gtfsstatic.gtfs \
   import Flags, CalendarService, CalendarServiceException, Stop, Route
 
