@@ -20,6 +20,7 @@ CREATE TABLE `TVehPos` (
 CREATE TABLE VehPosPb(
   S3Key char(50) Primary Key,
   NumRecs integer,
+  S3KeyDT DateTime,
   SDate DateTime,
   EDate DateTime)
 ;
@@ -27,14 +28,14 @@ CREATE TABLE VehPosPb(
 
 "insertVehPosPb": """
 
-INSERT IGNORE INTO VehPosPb(S3Key, NumRecs, SDate, EDate)
-VALUES (%s, %s, %s, %s)
+INSERT IGNORE INTO VehPosPb(S3Key, NumRecs, S3KeyDT, SDate, EDate)
+VALUES (%s, %s, %s, %s, %s)
 ;
 """,
 
 "selectVehPosPb_ByKey" : """
 
-SELECT S3Key, NumRecs, SDate, EDate
+SELECT S3Key, NumRecs, S3KeyDT, SDate, EDate
 FROM VehPosPb
 WHERE S3Key = '%s'
 ;

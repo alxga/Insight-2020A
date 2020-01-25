@@ -4,9 +4,6 @@ import os
 import sys
 from datetime import datetime, timedelta
 
-import boto3
-import pyspark
-from pyspark import SparkContext, SparkConf
 from pyspark.sql import SparkSession
 import mysql.connector
 
@@ -66,16 +63,10 @@ if __name__ == "__main__":
                  .getOrCreate()
 
   keys = s3.fetch_keys("pb/VehiclePos")
-  for k in keys:
-    print(s3.S3FeedKeyDT(k))
-
   file_list = spark.sparkContext.parallelize(keys)
   counts = file_list \
     .map(fetch_vehpospb_tpl) \
     .foreachPartition(lambda x: push_vehpospb_db(x))
 
-  output = counts.collect()
-  for o in output:
-    print(str(o))
-
   spark.stop()
+
