@@ -24,5 +24,7 @@ class Settings:
     self.IsCygwin = platform.system()[:6] == "CYGWIN"
     self.PyVersion = sys.version_info[0]
 
+    self.S3BucketName = "alxga-insde"
+
 
 Settings = Settings()

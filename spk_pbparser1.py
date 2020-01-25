@@ -3,29 +3,18 @@
 import os
 import sys
 from datetime import datetime, timedelta
+
+import boto3
 import pyspark
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
-
 import mysql.connector
-import boto3
 from google.protobuf.message import DecodeError
-import gtfs_realtime_pb2
+
 from common.credentials import S3ConnArgs, MySQLConnArgs
+from common import s3
 from queries import Queries
-
-
-def fetch_keys():
-  s3Bucket = "alxga-insde"
-  s3Res = boto3.resource('s3')
-
-  objKeys = []
-  bucket = s3Res.Bucket(s3Bucket)
-  for obj in bucket.objects.filter(Prefix='pb/VehiclePos'):
-    objKeys.append(obj.key)
-    if len(objKeys) > 100:
-      break
-  return objKeys
+import gtfs_realtime_pb2
 
 
 def pb2db_vehicle_pos(pbVal):
@@ -38,12 +27,12 @@ def pb2db_vehicle_pos(pbVal):
     pbVal.current_status, pbVal.current_stop_sequence, pbVal.stop_id
   )
 
-def fetch_tpls(objKey, s3ConnArgs):
+def fetch_tpls(objKey):
   ret = []
   message = gtfs_realtime_pb2.FeedMessage()
 
   s3Bucket = "alxga-insde"
-  s3Res = boto3.resource('s3', **s3ConnArgs)
+  s3Res = boto3.resource('s3', S3ConnArgs)
 
   obj = s3Res.Object(s3Bucket, objKey)
   body = obj.get()["Body"].read()
@@ -97,11 +86,10 @@ if __name__ == "__main__":
       .appName("PythonTestScript")\
       .getOrCreate()
 
-
-  keys = fetch_keys()
+  keys = s3.fetch_keys("pb/VehiclePos")
   file_list = spark.sparkContext.parallelize(keys)
   counts = file_list \
-    .flatMap(lambda x: [(x, fetch_tpls(x, S3ConnArgs))]) \
+    .flatMap(lambda x: [(x, fetch_tpls(x))]) \
     .map(vehpospb_row) \
     #.foreachPartition(lambda x: push_vehpospb_db(x, MySQLConnArgs))
 
