@@ -13,12 +13,15 @@ from queries import Queries
 
 
 def fetch_vehpospb_daterange():
-  cnx = mysql.connector.connect(**credentials.MySQLConnArgs)
-  cursor = cnx.cursor()
+  cnx = None
+  cursor = None
   sqlStmt = """
     SELECT min(S3KeyDT), max(S3KeyDT) FROM VehPosPb;
   """
+
   try:
+    cnx = mysql.connector.connect(**credentials.MySQLConnArgs)
+    cursor = cnx.cursor()
     cursor.execute(sqlStmt)
     return next(cursor)
   except StopIteration:
@@ -64,10 +67,10 @@ def fetch_vehpospb_tpl(objKey):
   return (objKey, len(dts), kdt, mn, mx)
 
 def push_vehpospb_db(tpls):
-  sqlStmt = Queries["insertVehPosPb"]
-
   cnx = None
   cursor = None
+  sqlStmt = Queries["insertVehPosPb"]
+
   try:
     cnx = mysql.connector.connect(**credentials.MySQLConnArgs)
     cursor = cnx.cursor()
