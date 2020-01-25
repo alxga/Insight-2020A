@@ -20,4 +20,4 @@ def process_entities(data,
       
     if eachVehiclePos and entity.HasField('vehicle'):
       eachVehiclePos(entity.vehicle)
-      ret.append(pb2db_vehicle_pos(entity.vehicle))
+

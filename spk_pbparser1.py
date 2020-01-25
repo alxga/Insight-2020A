@@ -6,11 +6,11 @@ from datetime import datetime, timedelta
 
 import boto3
 import pyspark
-from pyspark import SparkContext
+from pyspark import SparkContext, SparkConf
 from pyspark.sql import SparkSession
 import mysql.connector
 
-from common.credentials import S3ConnArgs, MySQLConnArgs
+from common import credentials
 from common import Settings, s3, gtfsrt
 from queries import Queries
 
@@ -41,13 +41,15 @@ def vehpospb_row(key_tpls):
   mx = max([tpl[1] for tpl in tpls], default=None)
   return (k, l, mn, mx)
 
-def push_vehpospb_db(tpls, mysqlConnArgs):
+def push_vehpospb_db(tpls):
   sqlStmt = Queries["insertVehPosPb"]
 
   cnx = None
   cursor = None
   try:
-    cnx = mysql.connector.connect(**mysqlConnArgs)
+    cnx = mysql.connector.connect(**credentials.MySQLConnArgs)
+    cnx.close()
+    return
     cursor = cnx.cursor()
     count = 0
     for tpl in tpls:
@@ -64,17 +66,23 @@ def push_vehpospb_db(tpls, mysqlConnArgs):
 
 
 if __name__ == "__main__":
-  spark = SparkSession\
-      .builder\
-      .appName("PythonTestScript")\
-      .getOrCreate()
+  builder = SparkSession.builder
+  for envVar in credentials.EnvVars:
+    try:
+      val = os.environ[envVar]
+      confKey = "spark.executorEnv.%s" % envVar
+      builder = builder.config(confKey, val)
+    except KeyError:
+      continue
+  spark = builder.appName("PythonTestScript") \
+                 .getOrCreate()
 
   keys = s3.fetch_keys("pb/VehiclePos")
   file_list = spark.sparkContext.parallelize(keys)
   counts = file_list \
     .flatMap(lambda x: [(x, fetch_tpls(x))]) \
     .map(vehpospb_row) \
-    #.foreachPartition(lambda x: push_vehpospb_db(x, MySQLConnArgs))
+    #.foreachPartition(lambda x: push_vehpospb_db(x))
 
   output = counts.collect()
   for o in output:

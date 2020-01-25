@@ -23,14 +23,14 @@ do
 done
 
 SPARKMYREQS=".reqs4spark.zip"
-MY_REQUIREMENTS="gtfs_realtime_pb2.py queries.py"
+MY_REQUIREMENTS="common"
 
 zip_my_requirements()
 {
   zip -r - $MY_REQUIREMENTS > "$SPARKMYREQS";
 }
 
-protoc gtfs-realtime.proto --python_out=.
+# protoc gtfs-realtime.proto --python_out=.
 zip_my_requirements
 
 args="--py-files=${SPARKMYREQS}"

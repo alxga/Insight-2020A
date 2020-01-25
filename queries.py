@@ -1,12 +1,5 @@
 Queries = {
-"insertVehPosPb": """
-
-INSERT IGNORE INTO VehPosPb(S3Key, NumRecs, SDate, EDate)
-VALUES (%s, %s, %s, %s)
-;
-""",
-
-"create": """
+"createVehPos": """
 
 CREATE TABLE `TVehPos` (
   `RouteId` char(50) DEFAULT NULL,
@@ -29,6 +22,21 @@ CREATE TABLE VehPosPb(
   NumRecs integer,
   SDate DateTime,
   EDate DateTime)
+;
+""",
+
+"insertVehPosPb": """
+
+INSERT IGNORE INTO VehPosPb(S3Key, NumRecs, SDate, EDate)
+VALUES (%s, %s, %s, %s)
+;
+""",
+
+"selectVehPosPb_ByKey" : """
+
+SELECT S3Key, NumRecs, SDate, EDate
+FROM VehPosPb
+WHERE S3Key = '%s'
 ;
 """,
 }

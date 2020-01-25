@@ -1,5 +1,16 @@
 import os
 
+EnvVars = [
+  "AWS_ACCESS_KEY_ID",
+  "AWS_SECRET_ACCESS_KEY",
+  "AWS_DEFAULT_REGION",
+
+  "MYSQL_USER",
+  "MYSQL_PWD",
+  "MYSQL_HOST",
+  "MYSQL_DBNAME"
+]
+
 S3ConnArgs = {
   "aws_access_key_id": os.environ["AWS_ACCESS_KEY_ID"],
   "aws_secret_access_key": os.environ["AWS_SECRET_ACCESS_KEY"],
