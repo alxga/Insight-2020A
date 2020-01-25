@@ -43,13 +43,14 @@ def vehpos_pb2_to_dbtpl(pbVal):
 
 def fetch_tpls(objKey):
   ret = []
-  data = s3.fetch_object_body(objKey)
+  s3Mgr = s3.S3Mgr()
+  data = s3Mgr.fetch_object_body(objKey)
   gtfsrt.process_entities(data,
       eachVehiclePos=lambda x: ret.append(vehpos_pb2_to_dbtpl(x))
   )
   return ret
 
-def push_vehpos_db(tpls):
+def push_vehpos_db(keyTpls):
   cnx = None
   cursor = None
   sqlStmt = Queries["insertVehPos"]
@@ -57,13 +58,16 @@ def push_vehpos_db(tpls):
   try:
     cnx = mysql.connector.connect(**credentials.MySQLConnArgs)
     cursor = cnx.cursor()
-    count = 0
-    for tpl in tpls:
-      cursor.execute(sqlStmt, tpl)
-      count += 1
-      if count % 1000 == 0:
+    tpls = []
+    for keyTpl in keyTpls:
+      tpls.append(keyTpl[1])
+      if len(tpls) >= 1000:
+        cursor.executemany(sqlStmt, tpls)
         cnx.commit()
-    cnx.commit()
+        tpls = []
+    if len(tpls) > 0:
+      cursor.executemany(sqlStmt, tpls)
+      cnx.commit()
   finally:
     if cursor:
       cursor.close()
@@ -80,19 +84,15 @@ if __name__ == "__main__":
       builder = builder.config(confKey, val)
     except KeyError:
       continue
-  spark = builder.appName("PythonTestScript") \
+  spark = builder.appName("UpdateVehPos") \
                  .getOrCreate()
 
   keys = fetch_keys_to_update()
-  keys = keys[0:1000]
   file_list = spark.sparkContext.parallelize(keys)
-  counts = file_list \
+  records = file_list \
     .flatMap(fetch_tpls) \
     .map(lambda tpl: ((tpl[1], tpl[3]), tpl)) \
-    .reduceByKey(lambda x, y: x[1])
-
-  output = counts.collect()
-  for o in output:
-    print(str(o))
+    .reduceByKey(lambda x, y: x) \
+    .foreachPartition(push_vehpos_db)
 
   spark.stop()
