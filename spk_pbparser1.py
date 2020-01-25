@@ -15,31 +15,19 @@ from common import Settings, s3, gtfsrt
 from queries import Queries
 
 
-def pb2db_vehicle_pos(pbVal):
-  tStamp = datetime.utcfromtimestamp(pbVal.timestamp)
-  # tStamp = tStamp.replace(tzinfo=timezone.utc).astimezone(tz=None)
-  return (
-    pbVal.trip.route_id, tStamp,
-    pbVal.vehicle.id, pbVal.trip.trip_id,
-    pbVal.position.latitude, pbVal.position.longitude,
-    pbVal.current_status, pbVal.current_stop_sequence, pbVal.stop_id
-  )
-
-def fetch_tpls(objKey):
-  ret = []
+def fetch_vehpospb_tpl(objKey):
   data = s3.fetch_object_body(objKey)
-  gtfsrt.process_entities(data,
-      eachVehiclePos=lambda x: ret.append(pb2db_vehicle_pos(x))
-  )
-  return ret
+  dts = []
 
-def vehpospb_row(key_tpls):
-  k = key_tpls[0]
-  tpls = key_tpls[1]
-  l = len(tpls)
-  mn = min([tpl[1] for tpl in tpls], default=None)
-  mx = max([tpl[1] for tpl in tpls], default=None)
-  return (k, l, mn, mx)
+  gtfsrt.process_entities(data,
+      eachVehiclePos=lambda x:
+          dts.append(datetime.utcfromtimestamp(x.timestamp))
+  )
+
+  kdt = s3.S3FeedKeyDT(objKey)
+  mn = min(dts, default=None)
+  mx = max(dts, default=None)
+  return (objKey, len(dts), kdt, mn, mx)
 
 def push_vehpospb_db(tpls):
   sqlStmt = Queries["insertVehPosPb"]
@@ -48,8 +36,8 @@ def push_vehpospb_db(tpls):
   cursor = None
   try:
     cnx = mysql.connector.connect(**credentials.MySQLConnArgs)
-    cnx.close()
-    return
+    # cnx.close()
+    # return
     cursor = cnx.cursor()
     count = 0
     for tpl in tpls:
@@ -74,15 +62,17 @@ if __name__ == "__main__":
       builder = builder.config(confKey, val)
     except KeyError:
       continue
-  spark = builder.appName("PythonTestScript") \
+  spark = builder.appName("UpdateVehPosPb") \
                  .getOrCreate()
 
   keys = s3.fetch_keys("pb/VehiclePos")
+  for k in keys:
+    print(s3.S3FeedKeyDT(k))
+
   file_list = spark.sparkContext.parallelize(keys)
   counts = file_list \
-    .flatMap(lambda x: [(x, fetch_tpls(x))]) \
-    .map(vehpospb_row) \
-    #.foreachPartition(lambda x: push_vehpospb_db(x))
+    .map(fetch_vehpospb_tpl) \
+    .foreachPartition(lambda x: push_vehpospb_db(x))
 
   output = counts.collect()
   for o in output:
