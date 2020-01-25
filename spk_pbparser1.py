@@ -9,12 +9,10 @@ import pyspark
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
 import mysql.connector
-from google.protobuf.message import DecodeError
 
 from common.credentials import S3ConnArgs, MySQLConnArgs
-from common import s3
+from common import Settings, s3, gtfsrt
 from queries import Queries
-import gtfs_realtime_pb2
 
 
 def pb2db_vehicle_pos(pbVal):
@@ -29,25 +27,10 @@ def pb2db_vehicle_pos(pbVal):
 
 def fetch_tpls(objKey):
   ret = []
-  message = gtfs_realtime_pb2.FeedMessage()
-
-  s3Bucket = "alxga-insde"
-  s3Res = boto3.resource('s3', S3ConnArgs)
-
-  obj = s3Res.Object(s3Bucket, objKey)
-  body = obj.get()["Body"].read()
-  try:
-    message.ParseFromString(body)
-  except DecodeError:
-    return ret
-
-  for entity in message.entity:
-    # if entity.HasField('alert'):
-    #   process_alert(entity.alert)
-    # if entity.HasField('trip_update'):
-    #   process_trip_update(entity.trip_update)
-    if entity.HasField('vehicle'):
-      ret.append(pb2db_vehicle_pos(entity.vehicle))
+  data = s3.fetch_object_body(objKey)
+  gtfsrt.process_entities(data,
+      eachVehiclePos=lambda x: ret.append(pb2db_vehicle_pos(x))
+  )
   return ret
 
 def vehpospb_row(key_tpls):

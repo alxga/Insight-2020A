@@ -13,3 +13,11 @@ def fetch_keys(prefix):
     if len(objKeys) > 100:
       break
   return objKeys
+
+def fetch_object_body(objKey):
+  s3Bucket = Settings.S3BucketName
+  s3Res = boto3.resource('s3', **S3ConnArgs)
+
+  obj = s3Res.Object(s3Bucket, objKey)
+  body = obj.get()["Body"].read()
+  return body
