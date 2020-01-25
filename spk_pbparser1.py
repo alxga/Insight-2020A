@@ -1,5 +1,8 @@
 # pylint: disable=unused-import
 
+import sys
+sys.path.insert(0, 'mysparkreqs.zip')
+
 import os
 from operator import add
 from datetime import datetime, timedelta
@@ -7,16 +10,23 @@ from datetime import datetime, timedelta
 import pyspark
 from pyspark import SparkContext
 from pyspark.sql import SparkSession
+import mysql.connector
 import boto3
 from google.protobuf.message import DecodeError
 import gtfs_realtime_pb2
-import sqlscripts
+from queries import Queries
 
 
 _s3ConnArgs = {
   "aws_access_key_id": os.environ["AWS_ACCESS_KEY_ID"],
   "aws_secret_access_key": os.environ["AWS_SECRET_ACCESS_KEY"],
   "region_name": os.environ["AWS_DEFAULT_REGION"]
+}
+_mysqlConnArgs = {
+  "user": os.environ['MYSQL_USER'],
+  "password": os.environ['MYSQL_PWD'],
+  "host": os.environ['MYSQL_HOST'],
+  "database": os.environ['MYSQL_DBNAME']
 }
 
 def fetch_keys():
@@ -33,7 +43,7 @@ def fetch_keys():
 
 
 def pb2db_vehicle_pos(pbVal):
-  tStamp = datetime.fromtimestamp(pbVal.timestamp)
+  tStamp = datetime.utcfromtimestamp(pbVal.timestamp)
   # tStamp = tStamp.replace(tzinfo=timezone.utc).astimezone(tz=None)
   return (
     pbVal.trip.route_id, tStamp,
@@ -69,9 +79,31 @@ def vehpospb_row(key_tpls):
   k = key_tpls[0]
   tpls = key_tpls[1]
   l = len(tpls)
-  mn = min([x[1] for x in tpls], default=None)
-  mx = max([x[1] for x in tpls], default=None)
+  mn = min([tpl[1] for tpl in tpls], default=None)
+  mx = max([tpl[1] for tpl in tpls], default=None)
   return (k, l, mn, mx)
+
+def push_vehpospb_db(tpls, mysqlConnArgs):
+  sqlStmt = Queries["insertVehPosPb"]
+
+  cnx = None
+  cursor = None
+  try:
+    cnx = mysql.connector.connect(**mysqlConnArgs)
+    cursor = cnx.cursor()
+    count = 0
+    for tpl in tpls:
+      cursor.execute(sqlStmt, tpl)
+      count += 1
+      if count % 1000 == 0:
+        cnx.commit()
+    cnx.commit()
+  finally:
+    if cursor:
+      cursor.close()
+    if cnx:
+      cnx.close()
+  
 
 
 if __name__ == "__main__":
@@ -80,14 +112,16 @@ if __name__ == "__main__":
       .appName("PythonTestScript")\
       .getOrCreate()
 
+
   keys = fetch_keys()
   file_list = spark.sparkContext.parallelize(keys)
   counts = file_list \
-    .flatMap(lambda x: (x, fetch_tpls(x, _s3ConnArgs))) \
-    .map(vehpospb_row)
+    .flatMap(lambda x: [(x, fetch_tpls(x, _s3ConnArgs))]) \
+    .map(vehpospb_row) \
+    .foreachPartition(lambda x: push_vehpospb_db(x, _mysqlConnArgs))
 
-  output = counts.collect()
-  for o in output:
-    print(str(o))
+  #output = counts.collect()
+  #for o in output:
+  #  print(str(o))
 
   spark.stop()
