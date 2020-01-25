@@ -3,26 +3,33 @@ import boto3
 from .settings import Settings
 from .credentials import S3ConnArgs
 
-def fetch_keys(prefix, limit=None):
-  s3Bucket = Settings.S3BucketName
-  s3Res = boto3.resource('s3', **S3ConnArgs)
+class S3Mgr:
+  def __init__(self, bucketName=Settings.S3BucketName):
+    self._Res = boto3.resource('s3', **S3ConnArgs)
+    self.bucketName = bucketName
 
-  objKeys = []
-  bucket = s3Res.Bucket(s3Bucket)
-  for obj in bucket.objects.filter(Prefix=prefix):
-    objKeys.append(obj.key)
-    if limit and len(objKeys) > limit:
-      break
-  return objKeys
+  def move_key(self, objKey, nObjKey):
+    self._Res.Object(self.bucketName, nObjKey). \
+      copy_from(
+        CopySource={
+          'Bucket': self.bucketName, 'Key': objKey
+        }
+      )
+    self._Res.Object(self.bucketName, objKey).delete()
 
+  def fetch_keys(self, prefix, limit=None):
+    objKeys = []
+    bucket = self._Res.Bucket(self.bucketName)
+    for obj in bucket.objects.filter(Prefix=prefix):
+      objKeys.append(obj.key)
+      if limit and len(objKeys) > limit:
+        break
+    return objKeys
 
-def fetch_object_body(objKey):
-  s3Bucket = Settings.S3BucketName
-  s3Res = boto3.resource('s3', **S3ConnArgs)
-
-  obj = s3Res.Object(s3Bucket, objKey)
-  body = obj.get()["Body"].read()
-  return body
+  def fetch_object_body(self, objKey):
+    obj = self._Res.Object(self.bucketName, objKey)
+    body = obj.get()["Body"].read()
+    return body
 
 
 def S3FeedKeyDT(objKey):

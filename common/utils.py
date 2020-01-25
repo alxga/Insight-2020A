@@ -1,3 +1,4 @@
+from datetime import timedelta, date
 from . import Settings
 
 __author__ = "Alex Ganin"
@@ -35,3 +36,8 @@ def remove_enclosing_quotes(txt):
     return txt[1:-1]
   else:
     return txt
+
+def daterange(start_date, end_date):
+  deltadays = int((end_date - start_date).days)
+  for n in range(deltadays):
+    yield start_date + timedelta(n)
