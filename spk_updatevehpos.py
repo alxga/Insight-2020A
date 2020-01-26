@@ -51,7 +51,7 @@ def push_vehpos_db(keyTpls):
     tpls = []
     for keyTpl in keyTpls:
       tpls.append(keyTpl[1])
-      if len(tpls) >= 1000:
+      if len(tpls) >= 100:
         cursor.executemany(sqlStmt, tpls)
         cnx.commit()
         tpls = []
@@ -76,7 +76,7 @@ def set_key_isinvehpos(objKeys):
     for objKey in objKeys:
       cursor.execute(sqlStmtMsk % objKey)
       uncommited += 1
-      if uncommited >= 1000:
+      if uncommited >= 100:
         cnx.commit()
         uncommited = 0
     if uncommited > 0:
@@ -101,16 +101,25 @@ if __name__ == "__main__":
                  .getOrCreate()
 
   keys = fetch_keys_to_update()
+  print("Got %d keys to deal with" % len(keys))
 
-  spark.sparkContext \
-    .parallelize(keys) \
-    .flatMap(fetch_tpls) \
-    .map(lambda tpl: ((tpl[1], tpl[3]), tpl)) \
-    .reduceByKey(lambda x, y: x) \
-    .foreachPartition(push_vehpos_db)
+  step = 1000
+  for i in range(0, len(keys), step):
+    lower = i
+    upper = i + step if i + step < len(keys) else len(keys)
+    keysSubrange = keys[lower:upper]
+    records = spark.sparkContext \
+      .parallelize(keysSubrange) \
+      .flatMap(fetch_tpls) \
+      .map(lambda tpl: ((tpl[1], tpl[3]), tpl)) \
+      .reduceByKey(lambda x, y: x)
 
-  spark.sparkContext \
-    .parallelize(keys) \
-    .foreachPartition(set_key_isinvehpos)
+    print("Inserting records for keys %d-%d into the DB" % (lower, upper - 1))
+    records.foreachPartition(push_vehpos_db)
+
+    print("Updating the VehPosPb table")
+    spark.sparkContext \
+      .parallelize(keysSubrange) \
+      .foreachPartition(set_key_isinvehpos)
 
   spark.stop()
