@@ -36,6 +36,6 @@ class S3Mgr:
 
 
 def S3FeedKeyDT(objKey):
-  dtval = objKey[-18:-3] # Naming assumed: 'pb/<Feed Name>/YYYYMMDD-HHMMSS.pb2'
-  dt = datetime.strptime(dtval, "%Y%m%d-%H%M%S")
+  dtval = objKey[-18:-3] # Naming assumed: 'pb/<Feed Name>/YYYYMMDD/HHMMSS.pb2'
+  dt = datetime.strptime(dtval, "%Y%m%d/%H%M%S")
   return dt

@@ -44,7 +44,7 @@ def fetch_keys_after_date(mxDT):
     fr = datetime(mxDT.year, mxDT.month, mxDT.day)
     to = datetime(utcNow.year, utcNow.month, utcNow.day + 1)
     for dt in utils.daterange(fr, to):
-      prefix = "pb/VehiclePos/%s" % dt.strftime("%Y%m%d-")
+      prefix = "pb/VehiclePos/%s" % dt.strftime("%Y%m%d")
       potentialKeys += s3Mgr.fetch_keys(prefix)
     for potentialKey in potentialKeys:
       keyDT = s3.S3FeedKeyDT(potentialKey)

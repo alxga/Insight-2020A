@@ -51,7 +51,7 @@ def download_feed(dirName, url, *args):
 
   try:
     # always use '/' as path separator in S3
-    objKey = '/'.join(["pb", dirName, fName])
+    objKey = '/'.join(["pb", dirName, fName.replace('-', '/')])
     s3Mgr = s3.S3Mgr()
     s3Mgr.upload_file(fPath, objKey)
     os.remove(fPath)
@@ -61,7 +61,7 @@ def download_feed(dirName, url, *args):
       push_vehpospb_dbtpl(tpl)
 
   except Exception: # pylint: disable=broad-except
-    print("Error while saving the file %s to S3" % fPath)
+    print("Error while saving the file %s to S3 and/or DB" % fPath)
     pass
 
 
