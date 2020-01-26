@@ -101,7 +101,6 @@ if __name__ == "__main__":
                  .getOrCreate()
 
   keys = fetch_keys_to_update()
-  keys = keys[0:10]
 
   spark.sparkContext \
     .parallelize(keys) \
