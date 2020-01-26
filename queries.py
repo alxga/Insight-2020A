@@ -50,4 +50,12 @@ FROM VehPosPb
 WHERE NumRecs > 0 and not IsInVehPos
 ;
 """,
+
+"updateVehPosPb_setIsInVehPos" : """
+
+UPDATE VehPosPb
+SET IsInVehPos = TRUE
+WHERE S3Key = '%s'
+;
+""",
 }

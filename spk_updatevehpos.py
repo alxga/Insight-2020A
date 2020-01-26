@@ -64,6 +64,29 @@ def push_vehpos_db(keyTpls):
     if cnx:
       cnx.close()
 
+def set_key_isinvehpos(objKeys):
+  cnx = None
+  cursor = None
+  sqlStmtMsk = Queries["updateVehPosPb_setIsInVehPos"]
+
+  try:
+    cnx = mysql.connector.connect(**credentials.MySQLConnArgs)
+    cursor = cnx.cursor()
+    uncommited = 0
+    for objKey in objKeys:
+      cursor.execute(sqlStmtMsk % objKey)
+      uncommited += 1
+      if uncommited >= 1000:
+        cnx.commit()
+        uncommited = 0
+    if uncommited > 0:
+      cnx.commit()
+  finally:
+    if cursor:
+      cursor.close()
+    if cnx:
+      cnx.close()
+
 
 if __name__ == "__main__":
   builder = SparkSession.builder
@@ -78,11 +101,17 @@ if __name__ == "__main__":
                  .getOrCreate()
 
   keys = fetch_keys_to_update()
-  file_list = spark.sparkContext.parallelize(keys)
-  records = file_list \
+  keys = keys[0:10]
+
+  spark.sparkContext \
+    .parallelize(keys) \
     .flatMap(fetch_tpls) \
     .map(lambda tpl: ((tpl[1], tpl[3]), tpl)) \
     .reduceByKey(lambda x, y: x) \
     .foreachPartition(push_vehpos_db)
+
+  spark.sparkContext \
+    .parallelize(keys) \
+    .foreachPartition(set_key_isinvehpos)
 
   spark.stop()
