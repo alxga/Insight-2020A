@@ -14,9 +14,9 @@ __author__ = "Alex Ganin"
 
 
 Feeds = [
-    ("VehiclePosT", "https://cdn.mbta.com/realtime/VehiclePositions.pb", 1),
-    ("TripUpdatesT", "https://cdn.mbta.com/realtime/TripUpdates.pb", 60),
-    ("AlertsT", "https://cdn.mbta.com/realtime/Alerts.pb", 30)
+    ("VehiclePos", "https://cdn.mbta.com/realtime/VehiclePositions.pb", 1),
+    ("TripUpdates", "https://cdn.mbta.com/realtime/TripUpdates.pb", 60),
+    ("Alerts", "https://cdn.mbta.com/realtime/Alerts.pb", 30)
 ]
 
 for feedTpl in Feeds:
