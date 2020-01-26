@@ -4,7 +4,7 @@
       "**/.git/subtree-cache/**": true,
       "**/venv/*/**": true
     },
-    "python.pythonPath": "/usr/bin/python3",
+    "python.pythonPath": "venvspark/bin/python",
     "python.linting.pylintArgs": [
       "--disable=no-member",
       "--disable=invalid-name",

@@ -16,7 +16,8 @@ def fetch_vehpospb_daterange():
   cnx = None
   cursor = None
   sqlStmt = """
-    SELECT min(S3KeyDT), max(S3KeyDT) FROM VehPosPb;
+    SELECT min(S3KeyDT), max(S3KeyDT) FROM VehPosPb
+    WHERE IsInVehPos;
   """
 
   try:
