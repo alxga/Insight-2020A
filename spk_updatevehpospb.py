@@ -4,8 +4,8 @@ import os
 import sys
 from datetime import datetime, timedelta
 
-from pyspark.sql import SparkSession
 import mysql.connector
+from pyspark.sql import SparkSession
 
 from common import credentials
 from common import Settings, s3, utils, gtfsrt
@@ -54,19 +54,9 @@ def fetch_keys_after_date(mxDT):
 def fetch_vehpospb_tpl(objKey):
   s3Mgr = s3.S3Mgr()
   data = s3Mgr.fetch_object_body(objKey)
-  dts = []
+  return gtfsrt.vehpospb_pb2_to_dbtpl(objKey, data)
 
-  gtfsrt.process_entities(data,
-      eachVehiclePos=lambda x:
-          dts.append(datetime.utcfromtimestamp(x.timestamp))
-  )
-
-  kdt = s3.S3FeedKeyDT(objKey)
-  mn = min(dts, default=None)
-  mx = max(dts, default=None)
-  return (objKey, len(dts), kdt, mn, mx)
-
-def push_vehpospb_db(tpls):
+def push_vehpospb_dbtpls(tpls):
   cnx = None
   cursor = None
   sqlStmt = Queries["insertVehPosPb"]
@@ -107,6 +97,6 @@ if __name__ == "__main__":
     file_list = spark.sparkContext.parallelize(keys)
     counts = file_list \
       .map(fetch_vehpospb_tpl) \
-      .foreachPartition(push_vehpospb_db)
+      .foreachPartition(push_vehpospb_dbtpls)
 
   spark.stop()

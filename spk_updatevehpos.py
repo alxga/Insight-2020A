@@ -4,8 +4,8 @@ import os
 import sys
 from datetime import datetime, timedelta
 
-from pyspark.sql import SparkSession
 import mysql.connector
+from pyspark.sql import SparkSession
 
 from common import credentials
 from common import Settings, s3, utils, gtfsrt
@@ -31,22 +31,12 @@ def fetch_keys_to_update():
     if cnx:
       cnx.close()
 
-def vehpos_pb2_to_dbtpl(pbVal):
-  tStamp = datetime.utcfromtimestamp(pbVal.timestamp)
-  # tStamp = tStamp.replace(tzinfo=timezone.utc).astimezone(tz=None)
-  return (
-    pbVal.trip.route_id, tStamp,
-    pbVal.vehicle.id, pbVal.trip.trip_id,
-    pbVal.position.latitude, pbVal.position.longitude,
-    pbVal.current_status, pbVal.current_stop_sequence, pbVal.stop_id
-  )
-
 def fetch_tpls(objKey):
   ret = []
   s3Mgr = s3.S3Mgr()
   data = s3Mgr.fetch_object_body(objKey)
   gtfsrt.process_entities(data,
-      eachVehiclePos=lambda x: ret.append(vehpos_pb2_to_dbtpl(x))
+      eachVehiclePos=lambda x: ret.append(gtfsrt.vehpos_pb2_to_dbtpl(x))
   )
   return ret
 

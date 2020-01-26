@@ -31,6 +31,9 @@ class S3Mgr:
     body = obj.get()["Body"].read()
     return body
 
+  def upload_file(self, fPath, objKey):
+    self._Res.Object(self.bucketName, objKey).upload_file(fPath)
+
 
 def S3FeedKeyDT(objKey):
   dtval = objKey[-18:-3] # Naming assumed: 'pb/<Feed Name>/YYYYMMDD-HHMMSS.pb2'

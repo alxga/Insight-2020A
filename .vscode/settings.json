@@ -4,7 +4,7 @@
       "**/.git/subtree-cache/**": true,
       "**/venv/*/**": true
     },
-    "python.pythonPath": "venvspark/bin/python",
+    "python.pythonPath": "/usr/bin/python3",
     "python.linting.pylintArgs": [
       "--disable=no-member",
       "--disable=invalid-name",
@@ -17,6 +17,7 @@
       "--disable=unused-argument",
       "--disable=stop-iteration-return",
       "--disable=bad-continuation",
+      "--disable=fixme",
       "--indent-string='  '"
     ],
     "python.testing.unittestArgs": [

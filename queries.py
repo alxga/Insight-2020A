@@ -3,7 +3,8 @@ Queries = {
 
 CREATE TABLE `VehPos` (
   `RouteId` char(50) DEFAULT NULL,
-  `DT` DateTime NOT NULL,
+  `Dt` Date NOT NULL,
+  `Tm` Time NOT NULL,
   `VehicleId` char(50) NOT NULL,
   `TripId` char(50) NOT NULL,
   `Lat` float NOT NULL,
@@ -18,9 +19,9 @@ CREATE TABLE `VehPos` (
 "insertVehPos": """
 
 INSERT IGNORE INTO VehPos(
-  RouteId, DT, VehicleId, TripId, Lat, Lon, Status, StopSeq, StopId
+  RouteId, Dt, Tm, VehicleId, TripId, Lat, Lon, Status, StopSeq, StopId
 )
-VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s);
+VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
 ;
 """,
 
