@@ -67,7 +67,7 @@ def push_vehpos_db(keyTpls):
 def set_key_isinvehpos(objKeys):
   cnx = None
   cursor = None
-  sqlStmtMsk = Queries["updateVehPosPb_setIsInVehPos"]
+  sqlStmtMsk = Queries["updateVehPosPb_setIsInVehPosMsk"]
 
   try:
     cnx = mysql.connector.connect(**credentials.MySQLConnArgs)

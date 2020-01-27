@@ -11,8 +11,8 @@ CREATE TABLE `VehPos` (
   `Status` tinyint(4) DEFAULT NULL,
   `StopSeq` int(11) DEFAULT NULL,
   `StopId` char(50) DEFAULT NULL,
-  UNIQUE KEY `unique_timetrip` (`DT`,`TripId`))
-;
+  UNIQUE KEY `unique_timetrip` (`DT`,`TripId`)
+);
 """,
 
 "insertVehPos": """
@@ -32,8 +32,8 @@ CREATE TABLE VehPosPb(
   S3KeyDT DateTime,
   SDate DateTime,
   EDate DateTime,
-  IsInVehPos tinyint(1) DEFAULT '0')
-;
+  IsInVehPos tinyint(1) DEFAULT '0'
+);
 """,
 
 "insertVehPosPb": """
@@ -51,11 +51,31 @@ WHERE NumRecs > 0 and not IsInVehPos
 ;
 """,
 
-"updateVehPosPb_setIsInVehPos" : """
+"updateVehPosPb_setIsInVehPosMsk" : """
 
 UPDATE VehPosPb
 SET IsInVehPos = TRUE
 WHERE S3Key = '%s'
+;
+""",
+
+"createTU" : """
+
+CREATE TABLE `TU`(
+  `S3KeyDT` DateTime,
+  `TripId` char(50),
+  `SDate` Date,
+  `StopId` char(50),
+  `StopSeq` integer,
+  `Arrival` DateTime,
+  `Departure` DateTime
+);
+""",
+
+"insertTU": """
+
+INSERT INTO TU(S3KeyDT, TripId, SDate, StopId, StopSeq, Arrival, Departure)
+VALUES (%s, %s, %s, %s, %s, %s, %s)
 ;
 """,
 }

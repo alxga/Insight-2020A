@@ -21,9 +21,9 @@ class S3Mgr:
     objKeys = []
     bucket = self._Res.Bucket(self.bucketName)
     for obj in bucket.objects.filter(Prefix=prefix):
-      objKeys.append(obj.key)
-      if limit and len(objKeys) > limit:
+      if limit and len(objKeys) >= limit:
         break
+      objKeys.append(obj.key)
     return objKeys
 
   def fetch_object_body(self, objKey):
@@ -37,5 +37,8 @@ class S3Mgr:
 
 def S3FeedKeyDT(objKey):
   dtval = objKey[-18:-3] # Naming assumed: 'pb/<Feed Name>/YYYYMMDD/HHMMSS.pb2'
-  dt = datetime.strptime(dtval, "%Y%m%d/%H%M%S")
+  if dtval[8] == '-': # TODO
+    dt = datetime.strptime(dtval, "%Y%m%d-%H%M%S")
+  else:
+    dt = datetime.strptime(dtval, "%Y%m%d/%H%M%S")
   return dt
