@@ -18,7 +18,7 @@
             "program": "${workspaceFolder}/schedule_viewer.py",
             "console": "integratedTerminal",
             "args": [
-              "~/data/MBTA_GTFS.zip"
+              "~/data/MBTA_GTFS_20200126.zip"
             ]
         }
     ]

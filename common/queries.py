@@ -1,3 +1,6 @@
+__author__ = "Alex Ganin"
+
+
 Queries = {
 "createVehPos": """
 
@@ -51,11 +54,12 @@ WHERE NumRecs > 0 and not IsInVehPos
 ;
 """,
 
-"updateVehPosPb_setIsInVehPosMsk" : """
+"selectVehPosPb_forDate" : """
 
-UPDATE VehPosPb
-SET IsInVehPos = TRUE
-WHERE S3Key = '%s'
+SELECT S3Key
+FROM VehPosPb
+WHERE NumRecs > 0 and IsInVehPos and
+      S3KeyDT > %s and S3KeyDT < %s 
 ;
 """,
 

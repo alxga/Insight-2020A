@@ -437,16 +437,6 @@ class Trip(GtfsObjectBase):
         stoptimes = self.GetStopTimes()
         return tuple(st.stop for st in stoptimes)
 
-    def AddHeadwayPeriodObject(self, headway_period, problem_reporter):
-        """Deprecated. Please use AddFrequencyObject instead."""
-        warnings.warn(
-            "No longer supported. The HeadwayPeriod class was renamed to "
-            "Frequency, and all related functions were renamed "
-            "accordingly.",
-            DeprecationWarning,
-        )
-        self.AddFrequencyObject(headway_period, problem_reporter)
-
     def AddFrequencyObject(self, frequency, problem_reporter):
         """Add a Frequency object to this trip's list of Frequencies."""
         if frequency is not None:

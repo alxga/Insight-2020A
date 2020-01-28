@@ -3,9 +3,13 @@ import boto3
 from .settings import Settings
 from .credentials import S3ConnArgs
 
+__author__ = "Alex Ganin"
+
+
 class S3Mgr:
   def __init__(self, bucketName=Settings.S3BucketName):
     self._Res = boto3.resource('s3', **S3ConnArgs)
+    self._Client = boto3.client('s3', **S3ConnArgs)
     self.bucketName = bucketName
 
   def move_key(self, objKey, nObjKey):
@@ -31,8 +35,16 @@ class S3Mgr:
     body = obj.get()["Body"].read()
     return body
 
+  def put_object_body(self, objKey, data):
+    obj = self._Res.Object(self.bucketName, objKey)
+    obj.put(Body=data)
+
   def upload_file(self, fPath, objKey):
     self._Res.Object(self.bucketName, objKey).upload_file(fPath)
+
+  def prefix_exists(self, prefix):
+    result = self._Client.list_objects(Bucket=self.bucketName, Prefix=prefix)
+    return result is not None
 
 
 def S3FeedKeyDT(objKey):

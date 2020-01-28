@@ -2,7 +2,7 @@ import os
 import sys
 import platform
 
-__author__ = "Alex"
+__author__ = "Alex Ganin"
 
 
 class Settings:

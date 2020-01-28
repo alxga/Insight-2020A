@@ -11,6 +11,8 @@ from common import credentials
 from common import Settings, s3, utils, gtfsrt
 from queries import Queries
 
+__author__ = "Alex Ganin"
+
 
 def recreate_table_tu():
   cnx = None

@@ -4,6 +4,11 @@
       "**/.git/subtree-cache/**": true,
       "**/venv/*/**": true
     },
+    "files.exclude": {
+      "**/__pycache__/": true,
+      "**/*.pyc": true,
+      "**/*.pkl": true
+    },
     "python.pythonPath": "venvspark/bin/python",
     "python.linting.pylintArgs": [
       "--disable=no-member",

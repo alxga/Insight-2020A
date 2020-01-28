@@ -9,7 +9,10 @@ from pyspark.sql import SparkSession
 
 from common import credentials
 from common import Settings, s3, utils, gtfsrt
-from queries import Queries
+from common.queries import Queries
+from common.queryutils import set_vehpospb_flag
+
+__author__ = "Alex Ganin"
 
 
 def fetch_keys_to_update():
@@ -64,29 +67,6 @@ def push_vehpos_db(keyTpls):
     if cnx:
       cnx.close()
 
-def set_key_isinvehpos(objKeys):
-  cnx = None
-  cursor = None
-  sqlStmtMsk = Queries["updateVehPosPb_setIsInVehPosMsk"]
-
-  try:
-    cnx = mysql.connector.connect(**credentials.MySQLConnArgs)
-    cursor = cnx.cursor()
-    uncommited = 0
-    for objKey in objKeys:
-      cursor.execute(sqlStmtMsk % objKey)
-      uncommited += 1
-      if uncommited >= 100:
-        cnx.commit()
-        uncommited = 0
-    if uncommited > 0:
-      cnx.commit()
-  finally:
-    if cursor:
-      cursor.close()
-    if cnx:
-      cnx.close()
-
 
 if __name__ == "__main__":
   builder = SparkSession.builder
@@ -120,6 +100,6 @@ if __name__ == "__main__":
     print("Updating the VehPosPb table")
     spark.sparkContext \
       .parallelize(keysSubrange) \
-      .foreachPartition(set_key_isinvehpos)
+      .foreachPartition(lambda x: set_vehpospb_flag("IsInVehPos", "TRUE", x))
 
   spark.stop()

@@ -1,4 +1,4 @@
-from datetime import timedelta, date
+from datetime import timedelta
 from . import Settings
 
 __author__ = "Alex Ganin"
