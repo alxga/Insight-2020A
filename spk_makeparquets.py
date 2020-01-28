@@ -92,7 +92,6 @@ if __name__ == "__main__":
   targetDates = fetch_dates_to_update()
   for targetDate in targetDates:
     keys = fetch_keys_to_update(targetDate)
-    keys = keys[0:10]
     print("Got %d keys of %s" % (len(keys), str(targetDate)), flush=True)
     if len(keys) <= 0:
       continue
