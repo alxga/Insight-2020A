@@ -94,7 +94,8 @@ if __name__ == "__main__":
   for targetDate in targetDates:
     keys = fetch_keys_to_update(targetDate)
     print("Got %d keys to deal with for %s" % (len(keys), str(targetDate)))
-
+    if len(keys) <= 0:
+      continue
 
     rddVP = spark.sparkContext \
       .parallelize(keys) \
