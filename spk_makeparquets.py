@@ -85,7 +85,7 @@ if __name__ == "__main__":
       builder = builder.config(confKey, val)
     except KeyError:
       continue
-  spark = builder.appName("UpdateVehPos") \
+  spark = builder.appName("MakeParquets") \
                  .getOrCreate()
 
 
