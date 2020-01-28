@@ -6,9 +6,9 @@ from datetime import datetime, timedelta
 
 import mysql.connector
 from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType
-from pyspark.sql.types import StructField
-from pyspark.sql.types import StringType, DateType, DoubleType, IntegerType
+from pyspark.sql.types import StructType, StructField
+from pyspark.sql.types \
+  import StringType, TimestampType, DoubleType, IntegerType
 
 from common import credentials
 from common import Settings, s3, utils, gtfsrt
@@ -92,7 +92,7 @@ if __name__ == "__main__":
   targetDates = fetch_dates_to_update()
   for targetDate in targetDates:
     keys = fetch_keys_to_update(targetDate)
-    print("Got %d keys to deal with for %s" % (len(keys), str(targetDate)))
+    print("Got %d keys of %s" % (len(keys), str(targetDate)), flush=True)
     if len(keys) <= 0:
       continue
 
@@ -102,9 +102,11 @@ if __name__ == "__main__":
       .map(lambda tpl: ((tpl[1], tpl[3]), tpl)) \
       .reduceByKey(lambda x, y: x).map(lambda x: x[1])
 
+    print("Reduced by key %d keys of %s" % (len(keys), str(targetDate)), flush=True)
+
     schema = StructType([
       StructField("RouteId", StringType(), True),
-      StructField("DT", DateType(), False),
+      StructField("DT", TimestampType(), False),
       StructField("VehicleId", StringType(), False),
       StructField("TripId", StringType(), False),
       StructField("Lat", DoubleType(), False),
@@ -114,16 +116,20 @@ if __name__ == "__main__":
       StructField("StopId", StringType(), True),
     ])
     dfVP = spark.createDataFrame(rddVP, schema)
+    print("Created dataframe for %d keys of %s" % (len(keys), str(targetDate)), flush=True)
     dfVP = dfVP.orderBy("DT", ascending=True)
+    print("Sorted by DT %d keys of %s" % (len(keys), str(targetDate)), flush=True)
 
     pqKey = targetDate.strftime("%Y%m%d")
     pqKey = '/'.join(["parquet", "VP-" + pqKey])
     pqKey = "s3a://alxga-insde/%s" % pqKey
     dfVP.write.format("parquet").mode("overwrite").save(pqKey)
+    print("Written to Parquet %d keys of %s" % (len(keys), str(targetDate)), flush=True)
 
     print("Updating the VehPosPb table %s" % pqKey)
     spark.sparkContext \
       .parallelize(keys) \
       .foreachPartition(lambda x: set_vehpospb_flag("IsInPq", "TRUE", x))
+    print("Updated IsInPq for %d keys of %s" % (len(keys), str(targetDate)), flush=True)
 
   spark.stop()
