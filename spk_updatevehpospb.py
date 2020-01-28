@@ -9,7 +9,7 @@ from pyspark.sql import SparkSession
 
 from common import credentials
 from common import Settings, s3, utils, gtfsrt
-from queries import Queries
+from common.queries import Queries
 
 __author__ = "Alex Ganin"
 

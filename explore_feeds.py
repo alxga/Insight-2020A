@@ -8,7 +8,7 @@ import mysql.connector
 
 from common import credentials
 from common import Settings, s3, utils, gtfsrt
-from queries import Queries
+from common.queries import Queries
 
 s3Mgr = s3.S3Mgr()
 keys = s3Mgr.fetch_keys("pb/TripUpdates/20200117", 100)
