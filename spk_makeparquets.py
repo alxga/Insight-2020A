@@ -72,7 +72,7 @@ def fetch_tpls(objKey):
   s3Mgr = s3.S3Mgr()
   data = s3Mgr.fetch_object_body(objKey)
   gtfsrt.process_entities(data,
-      eachVehiclePos=lambda x: ret.append(gtfsrt.vehpos_pb2_to_dbtpl(x))
+      eachVehiclePos=lambda x: ret.append(gtfsrt.vehpos_pb2_to_dbtpl_dtlocal(x))
   )
   return ret
 
@@ -92,6 +92,7 @@ if __name__ == "__main__":
   targetDates = fetch_dates_to_update()
   for targetDate in targetDates:
     keys = fetch_keys_to_update(targetDate)
+    keys = keys[0:10]
     print("Got %d keys of %s" % (len(keys), str(targetDate)), flush=True)
     if len(keys) <= 0:
       continue

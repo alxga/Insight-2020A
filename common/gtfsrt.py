@@ -36,12 +36,20 @@ def vehpospb_pb2_to_dbtpl(objKey, data):
   return (objKey, len(dts), kdt, mn, mx)
 
 
-def vehpos_pb2_to_dbtpl(pbVal):
-  tStamp = datetime.utcfromtimestamp(pbVal.timestamp)
-  # tStamp = tStamp.replace(tzinfo=timezone.utc).astimezone(tz=None)
+# use this with mysql.connector
+def vehpos_pb2_to_dbtpl_dtutc(pbVal):
+  dt = datetime.utcfromtimestamp(pbVal.timestamp)
   return (
-    pbVal.trip.route_id, tStamp,
-    pbVal.vehicle.id, pbVal.trip.trip_id,
+    pbVal.trip.route_id, dt, pbVal.vehicle.id, pbVal.trip.trip_id,
+    pbVal.position.latitude, pbVal.position.longitude,
+    pbVal.current_status, pbVal.current_stop_sequence, pbVal.stop_id
+  )
+
+# use this to create a pyspark Dataframe
+def vehpos_pb2_to_dbtpl_dtlocal(pbVal):
+  dt = datetime.fromtimestamp(pbVal.timestamp)
+  return (
+    pbVal.trip.route_id, dt, pbVal.vehicle.id, pbVal.trip.trip_id,
     pbVal.position.latitude, pbVal.position.longitude,
     pbVal.current_status, pbVal.current_stop_sequence, pbVal.stop_id
   )

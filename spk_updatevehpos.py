@@ -39,7 +39,7 @@ def fetch_tpls(objKey):
   s3Mgr = s3.S3Mgr()
   data = s3Mgr.fetch_object_body(objKey)
   gtfsrt.process_entities(data,
-      eachVehiclePos=lambda x: ret.append(gtfsrt.vehpos_pb2_to_dbtpl(x))
+      eachVehiclePos=lambda x: ret.append(gtfsrt.vehpos_pb2_to_dbtpl_dtutc(x))
   )
   return ret
 
@@ -81,7 +81,7 @@ if __name__ == "__main__":
                  .getOrCreate()
 
   keys = fetch_keys_to_update()
-  print("Got %d keys to deal with" % len(keys))
+  print("Got %d keys to deal with" % len(keys), flush=True)
 
   step = 1000
   for i in range(0, len(keys), step):
@@ -94,10 +94,11 @@ if __name__ == "__main__":
       .map(lambda tpl: ((tpl[1], tpl[3]), tpl)) \
       .reduceByKey(lambda x, y: x)
 
-    print("Inserting records for keys %d-%d into the DB" % (lower, upper - 1))
+    print("Inserting records for keys %d-%d into the DB" % (lower, upper - 1),
+          flush=True)
     records.foreachPartition(push_vehpos_db)
 
-    print("Updating the VehPosPb table")
+    print("Updating the VehPosPb table", flush=True)
     spark.sparkContext \
       .parallelize(keysSubrange) \
       .foreachPartition(lambda x: set_vehpospb_flag("IsInVehPos", "TRUE", x))
