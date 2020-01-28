@@ -1,3 +1,5 @@
+from datetime import datetime
+
 import mysql.connector
 
 from .credentials import MySQLConnArgs
@@ -25,6 +27,34 @@ def set_vehpospb_flag(flagName, value, objKeys):
         uncommited = 0
     if uncommited > 0:
       cnx.commit()
+  finally:
+    if cursor:
+      cursor.close()
+    if cnx:
+      cnx.close()
+
+
+def fetch_dates_to_update(whereStmt=None):
+  cnx = None
+  cursor = None
+  if whereStmt is None:
+    whereStmt = "True"
+  sqlStmt = """
+    SELECT DISTINCT Date(S3KeyDT) FROM VehPosPb WHERE %s;
+  """ % (whereStmt)
+  dtUtcNow = datetime.utcnow()
+
+  ret = []
+  try:
+    cnx = mysql.connector.connect(**MySQLConnArgs)
+    cursor = cnx.cursor()
+    cursor.execute(sqlStmt)
+    for tpl in cursor:
+      dt = tpl[0]
+      # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
+      if dtUtcNow > datetime(dt.year, dt.month, dt.day + 1, 8):
+        ret.append(dt)
+    return ret
   finally:
     if cursor:
       cursor.close()

@@ -10,38 +10,11 @@ from pyspark.sql.types import StructType, StructField
 from pyspark.sql.types \
   import StringType, TimestampType, DoubleType, IntegerType
 
-from common import credentials
-from common import Settings, s3, utils, gtfsrt
+from common import credentials, s3, utils, gtfsrt, queryutils, Settings
 from common.queries import Queries
-from common.queryutils import set_vehpospb_flag
 
 __author__ = "Alex Ganin"
 
-
-def fetch_dates_to_update():
-  cnx = None
-  cursor = None
-  sqlStmt = """
-    SELECT DISTINCT Date(S3KeyDT) FROM VehPosPb WHERE not IsInPq;
-  """
-  dtUtcNow = datetime.utcnow()
-
-  ret = []
-  try:
-    cnx = mysql.connector.connect(**credentials.MySQLConnArgs)
-    cursor = cnx.cursor()
-    cursor.execute(sqlStmt)
-    for tpl in cursor:
-      dt = tpl[0]
-      # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
-      if dtUtcNow > datetime(dt.year, dt.month, dt.day + 1, 8):
-        ret.append(dt)
-    return ret
-  finally:
-    if cursor:
-      cursor.close()
-    if cnx:
-      cnx.close()
 
 def fetch_keys_to_update(dt):
   cnx = None
@@ -89,7 +62,7 @@ if __name__ == "__main__":
                  .getOrCreate()
 
 
-  targetDates = fetch_dates_to_update()
+  targetDates = queryutils.fetch_dates_to_update("not IsInPq")
   for targetDate in targetDates:
     keys = fetch_keys_to_update(targetDate)
     print("Got %d keys of %s" % (len(keys), str(targetDate)), flush=True)
@@ -129,7 +102,9 @@ if __name__ == "__main__":
     print("Updating the VehPosPb table %s" % pqKey)
     spark.sparkContext \
       .parallelize(keys) \
-      .foreachPartition(lambda x: set_vehpospb_flag("IsInPq", "TRUE", x))
+      .foreachPartition(
+          lambda x: queryutils.set_vehpospb_flag("IsInPq", "TRUE", x)
+      )
     print("Updated IsInPq for %d keys of %s" % (len(keys), str(targetDate)), flush=True)
 
   spark.stop()
