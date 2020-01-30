@@ -10,7 +10,7 @@ from pyspark.sql import SparkSession
 from common import credentials
 from common import Settings, s3, utils, gtfsrt
 from common.queries import Queries
-from common.queryutils import DBConnCommonQueries
+from common.queryutils import DBConn, DBConnCommonQueries
 
 __author__ = "Alex Ganin"
 
@@ -21,7 +21,7 @@ def fetch_keys_to_update():
     WHERE NumRecs > 0 and not IsInVehPos;
   """
   ret = []
-  with DBConnCommonQueries() as con:
+  with DBConn() as con:
     cur = con.execute(sqlStmt)
     for tpl in cur:
       ret.append(tpl[0])
@@ -40,7 +40,7 @@ def fetch_tpls(objKey):
 
 def push_vehpos_db(keyTpls):
   sqlStmt = Queries["insertVehPos"]
-  with DBConnCommonQueries() as con:
+  with DBConn() as con:
     tpls = []
     for keyTpl in keyTpls:
       tpls.append(keyTpl[1])

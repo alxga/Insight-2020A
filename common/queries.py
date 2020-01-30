@@ -35,8 +35,7 @@ CREATE TABLE `VehPosPb`(
   `S3KeyDT` DateTime,
   `SDate` DateTime,
   `EDate` DateTime,
-  `IsInVehPos` tinyint(1) DEFAULT '0',
-  `IsInPq` tinyint(1) DEFAULT '0'
+  `IsInVehPos` tinyint(1) DEFAULT '0'
 );
 """,
 
@@ -121,9 +120,10 @@ VALUES (%s, %s, %s)
 ;
 """,
 
-"selectPqDates": """
+"selectPqDatesWhere": """
 
-SELECT D FROM `PqDates`;
+SELECT D FROM `PqDates`
+WHERE %s;
 """,
 
 "createVPDelays": """
@@ -132,6 +132,9 @@ CREATE TABLE `VPDelays` (
   `RouteId` char(50) DEFAULT NULL,
   `TripId` char(50) NOT NULL,
   `StopId` char(50) NOT NULL,
+  `StopName` char(200) DEFAULT NULL,
+  `StopLat` float NOT NULL,
+  `StopLon` float NOT NULL,
   `SchedDT` DateTime NOT NULL,
   `EstDT` DateTime NOT NULL,
   `EstDist` float NOT NULL,
@@ -142,9 +145,10 @@ CREATE TABLE `VPDelays` (
 "insertVPDelays": """
 
 INSERT INTO `VPDelays` (
-  RouteId, TripId, StopId, SchedDT, EstDT, EstDist, EstDelay
+  RouteId, TripId, StopId, StopName, StopLat, StopLon, SchedDT,
+  EstLat, EstLon, EstDT, EstDist, EstDelay
 )
-VALUES (%s, %s, %s, %s, %s, %s, %s)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 ;
 """,
 }

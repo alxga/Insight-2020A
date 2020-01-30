@@ -18,7 +18,7 @@ from transitfeed import shapelib
 from common import credentials
 from common import Settings, s3, utils, gtfsrt
 from common.queries import Queries
-from common.queryutils import DBConnCommonQueries
+from common.queryutils import DBConn, DBConnCommonQueries
 
 __author__ = "Alex Ganin"
 
@@ -73,6 +73,16 @@ def fetch_stop_times_df(spark, dt):
   return ret.filter("time is not NULL")
 
 
+def fetch_pqdts_to_update():
+  ret = []
+  sqlStmt = Queries["selectPqDatesWhere"] % "NumRecs > 0 and not IsInVPDelays"
+  with DBConn() as con:
+    cur = con.execute(sqlStmt)
+    for row in cur:
+      ret.append(row[0])
+  return ret
+
+
 VehPos = namedtuple("VehPos", "trip_id DT coords")
 
 
@@ -80,10 +90,13 @@ def calc_delays(targetDate, stopTimeLst, vehPosLst):
   ret = []
 
   for stopTime in stopTimeLst:
+    stopCoords = stopTime["coords"]
+    stopLatLon = stopCoords.ToLatLng()
+
     curClosest = None
     curDist = 1e10
     for vp in vehPosLst:
-      dist = stopTime["coords"].GetDistanceMeters(vp.coords)
+      dist = stopCoords.GetDistanceMeters(vp.coords)
       if dist < curDist:
         curDist = dist
         curClosest = vp
@@ -93,9 +106,11 @@ def calc_delays(targetDate, stopTimeLst, vehPosLst):
     daysDiff = round((schedDT - curClosest.DT).total_seconds() / (24 * 3600))
     schedDT += timedelta(days=daysDiff)
 
+    vpLatLon = curClosest.coords.ToLatLng()
     ret.append((
-        stopTime["route_id"], stopTime["trip_id"], stopTime["stop_id"],
-        schedDT, curClosest.DT, curDist,
+        stopTime["routeId"], stopTime["tripId"], stopTime["stopId"],
+        stopTime["stopName"], stopLatLon[0], stopLatLon[1], schedDT,
+        vpLatLon[0], vpLatLon[1], curClosest.DT, curDist,
         (curClosest.DT - schedDT).total_seconds()
     ))
 
@@ -110,11 +125,11 @@ def process_joined(targetDate, keyTpl1Tpl2):
   stopTimeLst = []
   for stopTimeRec in stopTimeRecs:
     stopTimeLst.append(dict(
-        trip_id=stopTimeRec[0],
-        stop_id=stopTimeRec[1],
+        tripId=stopTimeRec[0],
+        stopId=stopTimeRec[1],
         stopSeq=stopTimeRec[3],
         stopName=stopTimeRec[4],
-        route_id=stopTimeRec[8],
+        routeId=stopTimeRec[8],
         coords=shapelib.Point.FromLatLng(stopTimeRec[6], stopTimeRec[7])
     ))
     dt = utils.sched_time_to_dt(stopTimeRec[2], targetDate)
@@ -135,7 +150,7 @@ def process_joined(targetDate, keyTpl1Tpl2):
 
 def push_vpdelays_dbtpls(tpls):
   sqlStmt = Queries["insertVPDelays"]
-  with DBConnCommonQueries() as con:
+  with DBConn() as con:
     for tpl in tpls:
       con.execute(sqlStmt, tpl)
       if con.uncommited % 1000 == 0:
@@ -143,9 +158,19 @@ def push_vpdelays_dbtpls(tpls):
     con.commit()
 
 
+def set_pqdate_invpdelays(D):
+  sqlStmt = """
+    UPDATE `PqDates` SET `IsInVPDelays` = True
+    WHERE D = '%s';
+  """ % D.strftime("%Y-%m-%d")
+  with DBConn() as con:
+    con.execute(sqlStmt)
+    con.commit()
+
+
 def run(spark):
   with DBConnCommonQueries() as con:
-    con.create_table("VPDelays", True)
+    con.create_table("VPDelays", False)
 
   schedDT = datetime(2020, 1, 26)
 
@@ -170,12 +195,10 @@ def run(spark):
     .map(lambda rec: (rec.trip_id, tuple(rec))) \
     .groupByKey()
 
-  with DBConnCommonQueries() as con:
-    targetDates = con.fetch_dates_to_update()
+  targetDates = fetch_pqdts_to_update()
 
   for targetDate in targetDates:
-    targetDT = datetime(targetDate.year, targetDate.month, targetDate.day)
-    objUri = "VP-" + targetDT.strftime("%Y%m%d")
+    objUri = "VP-" + targetDate.strftime("%Y%m%d")
     objUri = "s3a://" + '/'.join((Settings.S3BucketName, "parquet", objUri))
     vpDF = spark.read.parquet(objUri)
 
@@ -186,6 +209,8 @@ def run(spark):
     joinRDD = stopTimesRDD.join(vpRDD) \
       .flatMap(lambda x: process_joined(targetDate, x)) \
       .foreachPartition(push_vpdelays_dbtpls)
+
+    set_pqdate_invpdelays(targetDate)
 
 
 if __name__ == "__main__":

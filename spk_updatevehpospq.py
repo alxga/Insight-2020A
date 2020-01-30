@@ -28,7 +28,7 @@ def fetch_parquet_dts():
     pfxDT += timedelta(days=1)
 
   existing = {}
-  sqlStmt = Queries["selectPqDates"]
+  sqlStmt = Queries["selectPqDatesWhere"] % "True"
   with DBConn() as con:
     cur = con.execute(sqlStmt)
     for row in cur:
