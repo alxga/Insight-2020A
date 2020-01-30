@@ -102,23 +102,28 @@ VALUES (%s, %s)
 SELECT Prefix FROM `S3Prefixes`;
 """,
 
-"createDailyPq": """
+"createPqDates": """
 
-CREATE TABLE `DailyPq` (
-  `S3Key` char(50) NOT NULL PRIMARY KEY,
+CREATE TABLE `PqDates` (
+  `D` Date PRIMARY KEY,
+  `NumKeys` integer NOT NULL,
   `NumRecs` integer NOT NULL,
-  `D` Date NOT NULL,
   `IsInVPDelays` tinyint(1) DEFAULT '0'
 );
 """,
 
-"insertDailyPq": """
+"insertPqDate": """
 
-INSERT INTO `DailyPq` (
-  S3Key, NumRecs, D
+INSERT INTO `PqDates` (
+  D, NumKeys, NumRecs
 )
 VALUES (%s, %s, %s)
 ;
+""",
+
+"selectPqDates": """
+
+SELECT D FROM `PqDates`;
 """,
 
 "createVPDelays": """
