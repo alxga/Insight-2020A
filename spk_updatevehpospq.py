@@ -38,7 +38,7 @@ def fetch_tpls(objKey):
   )
   return ret
 
-def set_vehpospb_ininpq(objKeys):
+def set_vehpospb_isinpq(objKeys):
   with DBConnCommonQueries() as con:
     con.set_vehpospb_flag("IsInPq", "TRUE", objKeys)
 
@@ -83,7 +83,7 @@ def run(spark):
     print("Updating the VehPosPb table %s" % pqKey)
     spark.sparkContext \
       .parallelize(keys) \
-      .foreachPartition(set_vehpospb_ininpq)
+      .foreachPartition(set_vehpospb_isinpq)
     print("Updated IsInPq for %d keys of %s" % (len(keys), str(targetDate)), flush=True)
 
 
