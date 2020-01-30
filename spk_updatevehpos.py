@@ -10,29 +10,19 @@ from pyspark.sql import SparkSession
 from common import credentials
 from common import Settings, s3, utils, gtfsrt
 from common.queries import Queries
-from common.queryutils import set_vehpospb_flag
+from common.queryutils import DBConnCommonQueries
 
 __author__ = "Alex Ganin"
 
 
 def fetch_keys_to_update():
-  cnx = None
-  cursor = None
   sqlStmt = Queries["selectVehPosPb_toAddVehPos"]
-
-  try:
-    cnx = mysql.connector.connect(**credentials.MySQLConnArgs)
-    cursor = cnx.cursor()
-    cursor.execute(sqlStmt)
-    ret = []
-    for tpl in cursor:
+  ret = []
+  with DBConnCommonQueries() as con:
+    cur = con.execute(sqlStmt)
+    for tpl in cur:
       ret.append(tpl[0])
-    return ret
-  finally:
-    if cursor:
-      cursor.close()
-    if cnx:
-      cnx.close()
+  return ret
 
 def fetch_tpls(objKey):
   ret = []
@@ -44,44 +34,27 @@ def fetch_tpls(objKey):
   return ret
 
 def push_vehpos_db(keyTpls):
-  cnx = None
-  cursor = None
   sqlStmt = Queries["insertVehPos"]
-
-  try:
-    cnx = mysql.connector.connect(**credentials.MySQLConnArgs)
-    cursor = cnx.cursor()
+  with DBConnCommonQueries() as con:
     tpls = []
     for keyTpl in keyTpls:
       tpls.append(keyTpl[1])
       if len(tpls) >= 100:
-        cursor.executemany(sqlStmt, tpls)
-        cnx.commit()
+        con.executemany(sqlStmt, tpls)
+        con.commit()
         tpls = []
     if len(tpls) > 0:
-      cursor.executemany(sqlStmt, tpls)
-      cnx.commit()
-  finally:
-    if cursor:
-      cursor.close()
-    if cnx:
-      cnx.close()
+      con.executemany(sqlStmt, tpls)
+      con.commit()
+
+def set_vehpospb_invehpos(objKeys):
+  with DBConnCommonQueries() as con:
+    con.set_vehpospb_flag("IsInVehPos", "TRUE", objKeys)
 
 
-if __name__ == "__main__":
-  builder = SparkSession.builder
-  for envVar in credentials.EnvVars:
-    try:
-      val = os.environ[envVar]
-      confKey = "spark.executorEnv.%s" % envVar
-      builder = builder.config(confKey, val)
-    except KeyError:
-      continue
-  spark = builder.appName("UpdateVehPos") \
-                 .getOrCreate()
-
+def run(spark):
   keys = fetch_keys_to_update()
-  print("Got %d keys to deal with" % len(keys), flush=True)
+  print("Got %d keys" % len(keys), flush=True)
 
   step = 1000
   for i in range(0, len(keys), step):
@@ -94,13 +67,30 @@ if __name__ == "__main__":
       .map(lambda tpl: ((tpl[1], tpl[3]), tpl)) \
       .reduceByKey(lambda x, y: x)
 
-    print("Inserting records for keys %d-%d into the DB" % (lower, upper - 1),
-          flush=True)
     records.foreachPartition(push_vehpos_db)
+    print("Inserted records for keys  %d-%d" %
+          (lower, upper - 1), flush=True)
 
-    print("Updating the VehPosPb table", flush=True)
     spark.sparkContext \
       .parallelize(keysSubrange) \
-      .foreachPartition(lambda x: set_vehpospb_flag("IsInVehPos", "TRUE", x))
+      .foreachPartition(set_vehpospb_invehpos)
+    print("Updated IsInVehPos for keys %d-%d" %
+          (lower, upper - 1), flush=True)
 
-  spark.stop()
+
+if __name__ == "__main__":
+  builder = SparkSession.builder
+  for envVar in credentials.EnvVars:
+    try:
+      val = os.environ[envVar]
+      confKey = "spark.executorEnv.%s" % envVar
+      builder = builder.config(confKey, val)
+    except KeyError:
+      continue
+  sparkSession = builder \
+    .appName("UpdateVehPos") \
+    .getOrCreate()
+
+  run(sparkSession)
+
+  sparkSession.stop()

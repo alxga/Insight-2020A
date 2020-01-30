@@ -20,7 +20,7 @@ CREATE TABLE `VehPos` (
 
 "insertVehPos": """
 
-INSERT IGNORE INTO VehPos(
+INSERT IGNORE INTO `VehPos` (
   RouteId, DT, VehicleId, TripId, Lat, Lon, Status, StopSeq, StopId
 )
 VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s);
@@ -29,19 +29,22 @@ VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s);
 
 "createVehPosPb": """
 
-CREATE TABLE VehPosPb(
-  S3Key char(50) Primary Key,
-  NumRecs integer,
-  S3KeyDT DateTime,
-  SDate DateTime,
-  EDate DateTime,
-  IsInVehPos tinyint(1) DEFAULT '0'
+CREATE TABLE `VehPosPb`(
+  `S3Key` char(50) Primary Key,
+  `NumRecs` integer,
+  `S3KeyDT` DateTime,
+  `SDate` DateTime,
+  `EDate` DateTime,
+  `IsInVehPos` tinyint(1) DEFAULT '0',
+  `IsInPq` tinyint(1) DEFAULT '0'
 );
 """,
 
 "insertVehPosPb": """
 
-INSERT IGNORE INTO VehPosPb(S3Key, NumRecs, S3KeyDT, SDate, EDate)
+INSERT IGNORE INTO `VehPosPb` (
+  S3Key, NumRecs, S3KeyDT, SDate, EDate
+)
 VALUES (%s, %s, %s, %s, %s)
 ;
 """,
@@ -65,7 +68,7 @@ WHERE NumRecs > 0 and IsInVehPos and
 
 "createTU" : """
 
-CREATE TABLE `TU`(
+CREATE TABLE `TU` (
   `S3KeyDT` DateTime,
   `TripId` char(50),
   `SDate` Date,
@@ -78,7 +81,31 @@ CREATE TABLE `TU`(
 
 "insertTU": """
 
-INSERT INTO TU(S3KeyDT, TripId, SDate, StopId, StopSeq, Arrival, Departure)
+INSERT INTO `TU` (
+  S3KeyDT, TripId, SDate, StopId, StopSeq, Arrival, Departure
+)
+VALUES (%s, %s, %s, %s, %s, %s, %s)
+;
+""",
+
+"createVPDelays": """
+
+CREATE TABLE `VPDelays` (
+  `RouteId` char(50) DEFAULT NULL,
+  `TripId` char(50) NOT NULL,
+  `StopId` char(50) NOT NULL,
+  `SchedDT` DateTime NOT NULL,
+  `EstDT` DateTime NOT NULL,
+  `EstDist` float NOT NULL,
+  `EstDelay` float NOT NULL
+);
+""",
+
+"insertVPDelays": """
+
+INSERT INTO `VPDelays` (
+  RouteId, TripId, StopId, SchedDT, EstDT, EstDist, EstDelay
+)
 VALUES (%s, %s, %s, %s, %s, %s, %s)
 ;
 """,

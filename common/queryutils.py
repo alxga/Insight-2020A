@@ -3,60 +3,103 @@ from datetime import datetime
 import mysql.connector
 
 from .credentials import MySQLConnArgs
+from .queries import Queries
 
 __author__ = "Alex Ganin"
 
 
-def set_vehpospb_flag(flagName, value, objKeys):
-  cnx = None
-  cursor = None
-  sqlStmtMsk = """
-    UPDATE VehPosPb SET `%s` = %s WHERE S3Key = '%s';
-  """
+class DBConn:
+  def __init__(self):
+    self._cnx = None
+    self._cur = None
+    self.uncommited = 0
 
-  try:
-    cnx = mysql.connector.connect(**MySQLConnArgs)
-    cursor = cnx.cursor()
-    uncommited = 0
+  def __enter__(self):
+    self._cnx = mysql.connector.connect(**MySQLConnArgs)
+    self._cur = self._cnx.cursor()
+    return self
+
+  def __exit__(self, exc_type, exc_val, exc_tb):
+    if self._cur:
+      self._cur.close()
+    if self._cnx:
+      self._cnx.close()
+
+  def execute(self, stmt, params=None):
+    self._cur.execute(stmt, params)
+    self.uncommited += 1
+    return self._cur
+
+  def executemany(self, stmt, params):
+    self._cur.executemany(stmt, params)
+    self.uncommited += 1
+
+  def commit(self):
+    self._cnx.commit()
+    self.uncommited = 0
+
+
+class DBConnCommonQueries(DBConn):
+  def set_vehpospb_flag(self, flagName, value, objKeys):
+    sqlStmtMsk = """
+      UPDATE VehPosPb SET `%s` = %s WHERE S3Key = '%s';
+    """
     for objKey in objKeys:
-      cursor.execute(sqlStmtMsk % (flagName, value, objKey))
-      print(sqlStmtMsk % (flagName, value, objKey))
-      uncommited += 1
-      if uncommited >= 100:
-        cnx.commit()
-        uncommited = 0
-    if uncommited > 0:
-      cnx.commit()
-  finally:
-    if cursor:
-      cursor.close()
-    if cnx:
-      cnx.close()
+      self.execute(sqlStmtMsk % (flagName, value, objKey))
+      if self.uncommited >= 100:
+        self.commit()
+    if self.uncommited > 0:
+      self.commit()
 
+  def fetch_dates_to_update(self, whereStmt=None):
+    if whereStmt is None:
+      whereStmt = "True"
+    sqlStmt = """
+      SELECT DISTINCT Date(S3KeyDT) FROM VehPosPb WHERE %s;
+    """ % (whereStmt)
+    dtUtcNow = datetime.utcnow()
 
-def fetch_dates_to_update(whereStmt=None):
-  cnx = None
-  cursor = None
-  if whereStmt is None:
-    whereStmt = "True"
-  sqlStmt = """
-    SELECT DISTINCT Date(S3KeyDT) FROM VehPosPb WHERE %s;
-  """ % (whereStmt)
-  dtUtcNow = datetime.utcnow()
-
-  ret = []
-  try:
-    cnx = mysql.connector.connect(**MySQLConnArgs)
-    cursor = cnx.cursor()
-    cursor.execute(sqlStmt)
+    ret = []
+    cursor = self.execute(sqlStmt)
     for tpl in cursor:
       dt = tpl[0]
       # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
       if dtUtcNow > datetime(dt.year, dt.month, dt.day + 1, 8):
         ret.append(dt)
     return ret
-  finally:
-    if cursor:
-      cursor.close()
-    if cnx:
-      cnx.close()
+
+  def fetch_vehpospb_daterange(self):
+    sqlStmt = """
+      SELECT min(S3KeyDT), max(S3KeyDT) FROM VehPosPb
+      WHERE IsInVehPos;
+    """
+    try:
+      return next(self.execute(sqlStmt))
+    except StopIteration:
+      return (None, None)
+
+  def table_exists(self, tableName):
+    sqlStmt = """
+      SELECT COUNT(*)
+      FROM information_schema.tables 
+      WHERE table_schema = '%s' 
+      AND table_name = '%s';
+    """ % (MySQLConnArgs["database"], tableName)
+    return next(self.execute(sqlStmt))[0] > 0
+
+  def drop_table(self, tableName):
+    sqlStmt = """
+      DROP TABLE IF EXISTS `%s`;
+    """ % (tableName)
+    self.execute(sqlStmt)
+    self.commit()
+
+  def create_table(self, tableName, rewriteIfExists):
+    createSqlStmt = Queries["create" + tableName]
+    if self.table_exists(tableName):
+      if rewriteIfExists:
+        self.drop_table(tableName)
+      else:
+        return False
+    self.execute(createSqlStmt)
+    self.commit()

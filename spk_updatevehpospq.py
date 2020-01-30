@@ -10,35 +10,24 @@ from pyspark.sql.types import StructType, StructField
 from pyspark.sql.types \
   import StringType, TimestampType, DoubleType, IntegerType
 
-from common import credentials, s3, utils, gtfsrt, queryutils, Settings
+from common import credentials, s3, utils, gtfsrt, Settings
 from common.queries import Queries
+from common.queryutils import DBConn, DBConnCommonQueries
 
 __author__ = "Alex Ganin"
 
 
 def fetch_keys_to_update(dt):
-  cnx = None
-  cursor = None
   sqlStmt = Queries["selectVehPosPb_forDate"]
-
-  try:
-    cnx = mysql.connector.connect(**credentials.MySQLConnArgs)
-    cursor = cnx.cursor()
+  with DBConn() as con:
     # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
     dt1 = datetime(dt.year, dt.month, dt.day, 8)
     dt2 = datetime(dt.year, dt.month, dt.day + 1, 8)
-    cursor.execute(sqlStmt, (dt1, dt2))
-
+    cur = con.execute(sqlStmt, (dt1, dt2))
     ret = []
-    for tpl in cursor:
+    for tpl in cur:
       ret.append(tpl[0])
     return ret
-  finally:
-    if cursor:
-      cursor.close()
-    if cnx:
-      cnx.close()
-
 
 def fetch_tpls(objKey):
   ret = []
@@ -49,23 +38,19 @@ def fetch_tpls(objKey):
   )
   return ret
 
-if __name__ == "__main__":
-  builder = SparkSession.builder
-  for envVar in credentials.EnvVars:
-    try:
-      val = os.environ[envVar]
-      confKey = "spark.executorEnv.%s" % envVar
-      builder = builder.config(confKey, val)
-    except KeyError:
-      continue
-  spark = builder.appName("MakeParquets") \
-                 .getOrCreate()
+def set_vehpospb_ininpq(objKeys):
+  with DBConnCommonQueries() as con:
+    con.set_vehpospb_flag("IsInPq", "TRUE", objKeys)
 
 
-  targetDates = queryutils.fetch_dates_to_update("not IsInPq")
+def run(spark):
+  with DBConnCommonQueries() as con:
+    targetDates = con.fetch_dates_to_update("NumRecs > 0 and not IsInPq")
+
   for targetDate in targetDates:
     keys = fetch_keys_to_update(targetDate)
     print("Got %d keys of %s" % (len(keys), str(targetDate)), flush=True)
+
     if len(keys) <= 0:
       continue
 
@@ -74,8 +59,6 @@ if __name__ == "__main__":
       .flatMap(fetch_tpls) \
       .map(lambda tpl: ((tpl[1], tpl[3]), tpl)) \
       .reduceByKey(lambda x, y: x).map(lambda x: x[1])
-
-    print("Reduced by key %d keys of %s" % (len(keys), str(targetDate)), flush=True)
 
     schema = StructType([
       StructField("RouteId", StringType(), True),
@@ -90,8 +73,6 @@ if __name__ == "__main__":
     ])
     dfVP = spark.createDataFrame(rddVP, schema)
     print("Created dataframe for %d keys of %s" % (len(keys), str(targetDate)), flush=True)
-    dfVP = dfVP.orderBy("DT", ascending=True)
-    print("Sorted by DT %d keys of %s" % (len(keys), str(targetDate)), flush=True)
 
     pqKey = targetDate.strftime("%Y%m%d")
     pqKey = '/'.join(["parquet", "VP-" + pqKey])
@@ -102,9 +83,23 @@ if __name__ == "__main__":
     print("Updating the VehPosPb table %s" % pqKey)
     spark.sparkContext \
       .parallelize(keys) \
-      .foreachPartition(
-          lambda x: queryutils.set_vehpospb_flag("IsInPq", "TRUE", x)
-      )
+      .foreachPartition(set_vehpospb_ininpq)
     print("Updated IsInPq for %d keys of %s" % (len(keys), str(targetDate)), flush=True)
 
-  spark.stop()
+
+if __name__ == "__main__":
+  builder = SparkSession.builder
+  for envVar in credentials.EnvVars:
+    try:
+      confKey = "spark.executorEnv.%s" % envVar
+      builder = builder.config(confKey, os.environ[envVar])
+    except KeyError:
+      continue
+
+  sparkSession = builder \
+    .appName("MakeParquets") \
+    .getOrCreate()
+
+  run(sparkSession)
+
+  sparkSession.stop()

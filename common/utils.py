@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 from . import Settings
 
 __author__ = "Alex Ganin"
@@ -41,3 +41,20 @@ def daterange(start_date, end_date):
   deltadays = int((end_date - start_date).days)
   for n in range(deltadays):
     yield start_date + timedelta(n)
+
+
+def sched_time_to_dt(timeStr, targetDate):
+  if targetDate is None:
+    targetDate = datetime.today()
+  tkns = timeStr.split(':')
+  h = int(tkns[0])
+  if h > 23:
+    h -= 24
+    delta = timedelta(days=1)
+  else:
+    delta = timedelta(days=0)
+  dt = datetime(
+        year=targetDate.year, month=targetDate.month, day=targetDate.day,
+        hour=h, minute=int(tkns[1]), second=int(tkns[2])
+    ) + delta
+  return dt

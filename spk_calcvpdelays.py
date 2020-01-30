@@ -1,73 +1,191 @@
 # pylint: disable=unused-import
 # pylint: disable=unused-variable
+# pylint: disable=cell-var-from-loop
 
 import os
 import sys
 from datetime import datetime, timedelta
 from collections import namedtuple
 
+import pytz
 import mysql.connector
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField
 from pyspark.sql.types \
   import StringType, TimestampType, DoubleType, IntegerType
 
+from transitfeed import shapelib
 from common import credentials
-from common import Settings, s3, utils, gtfsrt, queryutils, geo
+from common import Settings, s3, utils, gtfsrt
 from common.queries import Queries
+from common.queryutils import DBConnCommonQueries
 
 __author__ = "Alex Ganin"
 
 
-def fetch_stop_times_df(sparkSession, dt):
+def fetch_stops_df(spark, dt):
+  _objKey = dt.strftime("%Y%m%d")
+  _objKey = '/'.join(("GTFS", "MBTA_GTFS_" + _objKey, "stops.txt"))
+  _objUri = "s3a://%s/%s" % (Settings.S3BucketName, _objKey)
+
+  ret = spark.read.csv(_objUri, header=True)
+
+  colNames = ["stop_id", "stop_name", "location_type", "stop_lat", "stop_lon"]
+  ret = ret.select(colNames) \
+    .withColumn("location_type", ret.location_type.cast(IntegerType())) \
+    .withColumn("stop_lat", ret.stop_lat.cast(DoubleType())) \
+    .withColumn("stop_lon", ret.stop_lon.cast(DoubleType()))
+  return ret.filter("location_type = 0")
+
+
+def fetch_trips_df(spark, dt):
+  _objKey = dt.strftime("%Y%m%d")
+  _objKey = '/'.join(("GTFS", "MBTA_GTFS_" + _objKey, "trips.txt"))
+  _objUri = "s3a://%s/%s" % (Settings.S3BucketName, _objKey)
+
+  ret = spark.read.csv(_objUri, header=True)
+
+  colNames = ["trip_id", "route_id"]
+  return ret.select(colNames)
+
+
+def fetch_stop_times_df(spark, dt):
   _objKey = dt.strftime("%Y%m%d")
   _objKey = '/'.join(("GTFS", "MBTA_GTFS_" + _objKey, "stop_times.txt"))
   _objUri = "s3a://%s/%s" % (Settings.S3BucketName, _objKey)
+
   _schemaStopTimes = StructType([
     StructField("trip_id", StringType(), False),
-    StructField("arrival_time", StringType(), False),
-    StructField("departure_time", StringType(), False),
     StructField("stop_id", StringType(), False),
-    StructField("stop_sequence", StringType(), False),
-    StructField("stop_headsign", StringType(), True),
-    StructField("pickup_type", IntegerType(), True),
-    StructField("drop_off_type", IntegerType(), True),
-    StructField("timepoint", StringType(), True),
-    StructField("checkpoint_id", StringType(), True)
+    StructField("time", StringType(), False),
+    StructField("stop_seq", StringType(), False)
   ])
-  ret = sparkSession.read \
-    .schema(_schemaStopTimes) \
-    .option("mode", "DROPMALFORMED") \
-    .csv(_objUri, header=True)
+  ret = spark.read.csv(_objUri, header=True)
+  ret = ret.rdd.map(lambda row: dict(
+      trip_id=row.trip_id,
+      stop_id=row.stop_id,
+      time=row.arrival_time if row.arrival_time is not None else \
+                               row.departure_time,
+      stop_seq=row.stop_sequence)
+  )
+  ret = spark.createDataFrame(ret, schema=_schemaStopTimes)
+  ret = ret.withColumn("stop_seq", ret.stop_seq.cast(IntegerType()))
+  return ret.filter("time is not NULL")
+
+
+VehPos = namedtuple("VehPos", "trip_id DT coords")
+
+
+def calc_delays(targetDate, stopTimeLst, vehPosLst):
+  ret = []
+
+  for stopTime in stopTimeLst:
+    curClosest = None
+    curDist = 1e10
+    for vp in vehPosLst:
+      dist = stopTime["coords"].GetDistanceMeters(vp.coords)
+      if dist < curDist:
+        curDist = dist
+        curClosest = vp
+
+    # adjust the scheduled time for possible date mismatches
+    schedDT = stopTime["schedDT"]
+    daysDiff = round((schedDT - curClosest.DT).total_seconds() / (24 * 3600))
+    schedDT += timedelta(days=daysDiff)
+
+    ret.append((
+        stopTime["route_id"], stopTime["trip_id"], stopTime["stop_id"],
+        schedDT, curClosest.DT, curDist,
+        (curClosest.DT - schedDT).total_seconds()
+    ))
+
   return ret
 
 
-StopTime = namedtuple("StopTime", "trip_id stop_id timeStr")
-VehPos = namedtuple("VehPos", "trip_id tstamp coords")
-
-def process_joined(keyTpl1Tpl2):
+def process_joined(targetDate, keyTpl1Tpl2):
   key = keyTpl1Tpl2[0]
   stopTimeRecs = keyTpl1Tpl2[1][0]
   vehPosRecs = keyTpl1Tpl2[1][1]
 
   stopTimeLst = []
   for stopTimeRec in stopTimeRecs:
-    stopTimeLst.append(StopTime(
-        stopTimeRec[0], stopTimeRec[3], stopTimeRec[1],
+    stopTimeLst.append(dict(
+        trip_id=stopTimeRec[0],
+        stop_id=stopTimeRec[1],
+        stopSeq=stopTimeRec[3],
+        stopName=stopTimeRec[4],
+        route_id=stopTimeRec[8],
+        coords=shapelib.Point.FromLatLng(stopTimeRec[6], stopTimeRec[7])
     ))
+    dt = utils.sched_time_to_dt(stopTimeRec[2], targetDate)
+    dt = dt.replace(tzinfo=pytz.timezone("US/Eastern")) \
+      .astimezone(pytz.UTC)
+    stopTimeLst[-1]["schedDT"] = dt.replace(tzinfo=None)
+
   vehPosLst = []
   for vehPosRec in vehPosRecs:
     vehPosLst.append(VehPos(
-        vehPosRec[3], vehPosRec[1],
-        geo.Coords(vehPosRec[4], vehPosRec[5])
+        vehPosRec[3],
+        datetime.utcfromtimestamp(vehPosRec[1].timestamp()),
+        shapelib.Point.FromLatLng(vehPosRec[4], vehPosRec[5])
     ))
 
-  print("FOREACH")
-  print("Got %d stop_times for trip %s" % (len(stopTimeLst), key))
-  print("Got %d vehicle positions for trip %s" % (len(vehPosLst), key))
+  return calc_delays(targetDate, stopTimeLst, vehPosLst)
 
 
+def push_vpdelays_dbtpls(tpls):
+  sqlStmt = Queries["insertVPDelays"]
+  with DBConnCommonQueries() as con:
+    for tpl in tpls:
+      con.execute(sqlStmt, tpl)
+      if con.uncommited % 1000 == 0:
+        con.commit()
+    con.commit()
 
+
+def run(spark):
+  with DBConnCommonQueries() as con:
+    con.create_table("VPDelays", True)
+
+  schedDT = datetime(2020, 1, 26)
+
+  # rename some columns to disambiguate after joining the tables
+  stopsDF = fetch_stops_df(spark, schedDT) \
+    .withColumnRenamed("stop_id", "stops_stop_id")
+  stopTimesDF = fetch_stop_times_df(spark, schedDT)
+  tripsDF = fetch_trips_df(spark, schedDT) \
+    .withColumnRenamed("trip_id", "trips_trip_id")
+
+  stopTimesDF = stopTimesDF \
+    .join(stopsDF, stopTimesDF.stop_id == stopsDF.stops_stop_id)
+  stopTimesDF = stopTimesDF \
+    .join(tripsDF, stopTimesDF.trip_id == tripsDF.trips_trip_id)
+  colNames = [
+    "trip_id", "stop_id", "time", "stop_seq", "stop_name", "location_type",
+    "stop_lat", "stop_lon", "route_id"
+  ]
+  stopTimesDF = stopTimesDF.select(colNames)
+
+  stopTimesRDD = stopTimesDF.rdd \
+    .map(lambda rec: (rec.trip_id, tuple(rec))) \
+    .groupByKey()
+
+  with DBConnCommonQueries() as con:
+    targetDates = con.fetch_dates_to_update()
+
+  for targetDate in targetDates:
+    targetDT = datetime(targetDate.year, targetDate.month, targetDate.day)
+    objUri = "VP-" + targetDT.strftime("%Y%m%d")
+    objUri = "s3a://" + '/'.join((Settings.S3BucketName, "parquet", objUri))
+    vpDF = spark.read.parquet(objUri)
+
+    vpRDD = vpDF.rdd \
+      .map(lambda rec: (rec.TripId, tuple(rec))) \
+      .groupByKey()
+
+    joinRDD = stopTimesRDD.join(vpRDD) \
+      .flatMap(lambda x: process_joined(targetDate, x)) \
+      .foreachPartition(push_vpdelays_dbtpls)
 
 
 
@@ -81,29 +199,10 @@ if __name__ == "__main__":
       builder = builder.config(confKey, val)
     except KeyError:
       continue
-  spark = builder.appName("CalcVPDelays") \
-                 .getOrCreate()
+  sparkSession = builder \
+    .appName("CalcVPDelays") \
+    .getOrCreate()
 
-  schedDT = datetime(2020, 1, 19)
-  stopTimesDF = fetch_stop_times_df(spark, schedDT)
-  stopTimesRDD = stopTimesDF.rdd \
-    .map(lambda rec: (rec.trip_id, tuple(rec))) \
-    .groupByKey()
+  run(sparkSession)
 
-  targetDates = queryutils.fetch_dates_to_update()
-
-  for targetDate in targetDates:
-    targetDT = datetime(targetDate.year, targetDate.month, targetDate.day)
-    objUri = "VP-" + targetDT.strftime("%Y%m%d")
-    objUri = "s3a://" + '/'.join((Settings.S3BucketName, "parquet", objUri))
-    vpDF = spark.read.parquet(objUri)
-
-    vpRDD = vpDF.rdd \
-      .map(lambda rec: (rec.TripId, tuple(rec))) \
-      .groupByKey()
-
-    joinRDD = stopTimesRDD.join(vpRDD) \
-      .foreach(process_joined)
-
-  spark.stop()
-
+  sparkSession.stop()
