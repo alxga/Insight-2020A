@@ -68,7 +68,8 @@ def run(spark):
   pfxs = fetch_s3prefixes()
   s3Mgr = s3.S3Mgr()
   for pfx in pfxs:
-    keys = s3Mgr.fetch_keys(pfx)
+    fullPfx = '/'.join(("pb", "VehiclePos", pfx))
+    keys = s3Mgr.fetch_keys(fullPfx)
     if len(keys) > 0:
       print("PROCESSING %d KEYS FOR %s" % (len(keys), pfx))
       file_list = spark.sparkContext.parallelize(keys)
