@@ -129,6 +129,7 @@ WHERE %s;
 "createVPDelays": """
 
 CREATE TABLE `VPDelays` (
+  `D` Date NOT NULL,
   `RouteId` char(50) DEFAULT NULL,
   `TripId` char(50) NOT NULL,
   `StopId` char(50) NOT NULL,
@@ -147,10 +148,10 @@ CREATE TABLE `VPDelays` (
 "insertVPDelays": """
 
 INSERT INTO `VPDelays` (
-  RouteId, TripId, StopId, StopName, StopLat, StopLon, SchedDT,
+  D, RouteId, TripId, StopId, StopName, StopLat, StopLon, SchedDT,
   EstLat, EstLon, EstDT, EstDist, EstDelay
 )
-VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 ;
 """,
 }

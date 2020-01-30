@@ -108,6 +108,7 @@ def calc_delays(targetDate, stopTimeLst, vehPosLst):
 
     vpLatLon = curClosest.coords.ToLatLng()
     ret.append((
+        targetDate,
         stopTime["routeId"], stopTime["tripId"], stopTime["stopId"],
         stopTime["stopName"], stopLatLon[0], stopLatLon[1], schedDT,
         vpLatLon[0], vpLatLon[1], curClosest.DT, curDist,
