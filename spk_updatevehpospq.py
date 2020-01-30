@@ -17,7 +17,7 @@ from common.queryutils import DBConn, DBConnCommonQueries
 __author__ = "Alex Ganin"
 
 
-def fetch_keys_to_update(dt):
+def fetch_keys_for_date(dt):
   sqlStmt = Queries["selectVehPosPb_forDate"]
   with DBConn() as con:
     # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)

@@ -51,9 +51,7 @@ class DBConnCommonQueries(DBConn):
     if self.uncommited > 0:
       self.commit()
 
-  def fetch_dates_to_update(self, whereStmt=None):
-    if whereStmt is None:
-      whereStmt = "True"
+  def fetch_dates_to_update(self, whereStmt="True"):
     sqlStmt = """
       SELECT DISTINCT Date(S3KeyDT) FROM VehPosPb WHERE %s;
     """ % (whereStmt)
@@ -68,11 +66,10 @@ class DBConnCommonQueries(DBConn):
         ret.append(dt)
     return ret
 
-  def fetch_vehpospb_daterange(self):
+  def fetch_vehpospb_daterange(self, whereStmt="True"):
     sqlStmt = """
-      SELECT min(S3KeyDT), max(S3KeyDT) FROM VehPosPb
-      WHERE IsInVehPos;
-    """
+      SELECT min(S3KeyDT), max(S3KeyDT) FROM VehPosPb WHERE %s;
+    """ % (whereStmt)
     try:
       return next(self.execute(sqlStmt))
     except StopIteration:

@@ -188,8 +188,6 @@ def run(spark):
       .foreachPartition(push_vpdelays_dbtpls)
 
 
-
-
 if __name__ == "__main__":
   builder = SparkSession.builder
   for envVar in credentials.EnvVars:

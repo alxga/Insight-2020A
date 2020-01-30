@@ -88,6 +88,47 @@ VALUES (%s, %s, %s, %s, %s, %s, %s)
 ;
 """,
 
+"createS3Prefixes": """
+
+CREATE TABLE `S3Prefixes` (
+  `Prefix` char(50) PRIMARY KEY,
+  `NumRecs` integer NOT NULL
+);
+""",
+
+"insertS3Prefix": """
+
+INSERT INTO `S3Prefixes` (
+  Prefix, NumRecs
+)
+VALUES (%s, %s, %s)
+;
+""",
+
+"selectS3Prefixes": """
+
+SELECT Prefix FROM `S3Prefixes`;
+""",
+
+"createDailyPq": """
+
+CREATE TABLE `DailyPq` (
+  `S3Key` char(50) NOT NULL PRIMARY KEY,
+  `NumRecs` integer NOT NULL,
+  `D` Date NOT NULL,
+  `IsInVPDelays` tinyint(1) DEFAULT '0'
+);
+""",
+
+"insertDailyPq": """
+
+INSERT INTO `DailyPq` (
+  S3Key, NumRecs, D
+)
+VALUES (%s, %s, %s)
+;
+""",
+
 "createVPDelays": """
 
 CREATE TABLE `VPDelays` (
