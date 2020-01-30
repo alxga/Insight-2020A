@@ -32,7 +32,7 @@ def fetch_s3prefixes():
     for row in cur:
       existing[row[0]] = 1
 
-  for pfx in ret:
+  for pfx in pfxs:
     if pfx not in existing:
       ret.append(pfx)
 

@@ -101,7 +101,7 @@ CREATE TABLE `S3Prefixes` (
 INSERT INTO `S3Prefixes` (
   Prefix, NumRecs
 )
-VALUES (%s, %s, %s)
+VALUES (%s, %s)
 ;
 """,
 
