@@ -1,0 +1,80 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003" DefaultTargets="Build">
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{aee76fc0-2299-4fdf-b0b9-c361e46077b2}</ProjectGuid>
+    <ProjectHome />
+    <StartupFile>process_vp.py</StartupFile>
+    <SearchPath />
+    <WorkingDirectory>.</WorkingDirectory>
+    <OutputPath>.</OutputPath>
+    <ProjectTypeGuids>{888888a0-9f3d-457c-b088-3a5042f75d52}</ProjectTypeGuids>
+    <LaunchProvider>Standard Python launcher</LaunchProvider>
+    <InterpreterId>Global|ContinuumAnalytics|Anaconda36-64</InterpreterId>
+    <Name>MBTATracker</Name>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'" />
+  <PropertyGroup Condition="'$(Configuration)' == 'Release'" />
+  <PropertyGroup>
+    <VisualStudioVersion Condition=" '$(VisualStudioVersion)' == '' ">10.0</VisualStudioVersion>
+  </PropertyGroup>
+  <ItemGroup>
+    <InterpreterReference Include="Global|ContinuumAnalytics|Anaconda36-64" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include=".gitignore" />
+    <Content Include="myspark.sh" />
+  </ItemGroup>
+  <ItemGroup>
+    <Folder Include="common\" />
+    <Folder Include="transitfeed\" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="air_dagbag.py" />
+    <Compile Include="common\appex.py" />
+    <Compile Include="common\credentials.py" />
+    <Compile Include="common\geo.py" />
+    <Compile Include="common\gtfsrt.py" />
+    <Compile Include="common\queries.py" />
+    <Compile Include="common\queryutils.py" />
+    <Compile Include="common\s3.py" />
+    <Compile Include="common\settings.py" />
+    <Compile Include="common\utils.py" />
+    <Compile Include="common\__init__.py" />
+    <Compile Include="download_mbta.py" />
+    <Compile Include="gtfszip_to_s3.py" />
+    <Compile Include="schedule_viewer.py" />
+    <Compile Include="spk_calcvpdelays.py" />
+    <Compile Include="spk_updatetu.py" />
+    <Compile Include="spk_updatevehpos.py" />
+    <Compile Include="spk_updatevehpospb.py" />
+    <Compile Include="spk_updatevehpospq.py" />
+    <Compile Include="transitfeed\agency.py" />
+    <Compile Include="transitfeed\errors.py" />
+    <Compile Include="transitfeed\fareattribute.py" />
+    <Compile Include="transitfeed\farerule.py" />
+    <Compile Include="transitfeed\feedinfo.py" />
+    <Compile Include="transitfeed\frequency.py" />
+    <Compile Include="transitfeed\gtfsfactory.py" />
+    <Compile Include="transitfeed\gtfsfactoryuser.py" />
+    <Compile Include="transitfeed\gtfsobjectbase.py" />
+    <Compile Include="transitfeed\loader.py" />
+    <Compile Include="transitfeed\problems.py" />
+    <Compile Include="transitfeed\route.py" />
+    <Compile Include="transitfeed\schedule.py" />
+    <Compile Include="transitfeed\serviceperiod.py" />
+    <Compile Include="transitfeed\shape.py" />
+    <Compile Include="transitfeed\shapelib.py" />
+    <Compile Include="transitfeed\shapeloader.py" />
+    <Compile Include="transitfeed\shapepoint.py" />
+    <Compile Include="transitfeed\stop.py" />
+    <Compile Include="transitfeed\stoptime.py" />
+    <Compile Include="transitfeed\transfer.py" />
+    <Compile Include="transitfeed\trip.py" />
+    <Compile Include="transitfeed\util.py" />
+    <Compile Include="transitfeed\version.py" />
+    <Compile Include="transitfeed\__init__.py" />
+  </ItemGroup>
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)\Python Tools\Microsoft.PythonTools.targets" />
+</Project>
