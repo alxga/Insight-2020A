@@ -40,17 +40,6 @@ class DBConn:
 
 
 class DBConnCommonQueries(DBConn):
-  def set_vehpospb_flag(self, flagName, value, objKeys):
-    sqlStmtMsk = """
-      UPDATE VehPosPb SET `%s` = %s WHERE S3Key = '%s';
-    """
-    for objKey in objKeys:
-      self.execute(sqlStmtMsk % (flagName, value, objKey))
-      if self.uncommited >= 100:
-        self.commit()
-    if self.uncommited > 0:
-      self.commit()
-
   def fetch_dates_to_update(self, whereStmt="True"):
     sqlStmt = """
       SELECT DISTINCT Date(S3KeyDT) FROM VehPosPb WHERE %s;
@@ -65,15 +54,6 @@ class DBConnCommonQueries(DBConn):
       if dtUtcNow > datetime(dt.year, dt.month, dt.day + 1, 8):
         ret.append(dt)
     return ret
-
-  def fetch_vehpospb_daterange(self, whereStmt="True"):
-    sqlStmt = """
-      SELECT min(S3KeyDT), max(S3KeyDT) FROM VehPosPb WHERE %s;
-    """ % (whereStmt)
-    try:
-      return next(self.execute(sqlStmt))
-    except StopIteration:
-      return (None, None)
 
   def table_exists(self, tableName):
     sqlStmt = """

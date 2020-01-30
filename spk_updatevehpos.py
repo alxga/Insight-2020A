@@ -16,13 +16,17 @@ __author__ = "Alex Ganin"
 
 
 def fetch_keys_to_update():
-  sqlStmt = Queries["selectVehPosPb_toAddVehPos"]
+  sqlStmt = """
+    SELECT S3Key FROM `VehPosPb`
+    WHERE NumRecs > 0 and not IsInVehPos;
+  """
   ret = []
   with DBConnCommonQueries() as con:
     cur = con.execute(sqlStmt)
     for tpl in cur:
       ret.append(tpl[0])
   return ret
+
 
 def fetch_tpls(objKey):
   ret = []
@@ -32,6 +36,7 @@ def fetch_tpls(objKey):
       eachVehiclePos=lambda x: ret.append(gtfsrt.vehpos_pb2_to_dbtpl_dtutc(x))
   )
   return ret
+
 
 def push_vehpos_db(keyTpls):
   sqlStmt = Queries["insertVehPos"]
@@ -47,9 +52,18 @@ def push_vehpos_db(keyTpls):
       con.executemany(sqlStmt, tpls)
       con.commit()
 
+
 def set_vehpospb_invehpos(objKeys):
+  sqlStmtMsk = """
+    UPDATE `VehPosPb` SET `IsInVehPos` = True
+    WHERE S3Key = '%s';
+  """
   with DBConnCommonQueries() as con:
-    con.set_vehpospb_flag("IsInVehPos", "TRUE", objKeys)
+    for objKey in objKeys:
+      con.execute(sqlStmtMsk % objKey)
+      if con.uncommited >= 100:
+        con.commit()
+    con.commit()
 
 
 def run(spark):

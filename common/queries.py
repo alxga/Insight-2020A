@@ -49,14 +49,6 @@ VALUES (%s, %s, %s, %s, %s)
 ;
 """,
 
-"selectVehPosPb_toAddVehPos" : """
-
-SELECT S3Key
-FROM VehPosPb
-WHERE NumRecs > 0 and not IsInVehPos
-;
-""",
-
 "selectVehPosPb_forDate" : """
 
 SELECT S3Key
