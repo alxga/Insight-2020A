@@ -136,6 +136,8 @@ CREATE TABLE `VPDelays` (
   `StopLat` float NOT NULL,
   `StopLon` float NOT NULL,
   `SchedDT` DateTime NOT NULL,
+  `EstLat` float NOT NULL,
+  `EstLon` float NOT NULL,
   `EstDT` DateTime NOT NULL,
   `EstDist` float NOT NULL,
   `EstDelay` float NOT NULL
