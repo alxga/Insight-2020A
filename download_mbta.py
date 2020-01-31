@@ -3,6 +3,7 @@ import time
 import threading
 from datetime import datetime
 import requests
+import traceback
 
 import mysql.connector
 
@@ -62,6 +63,7 @@ def download_feed(dirName, url, *args):
 
   except Exception: # pylint: disable=broad-except
     print("Error while saving the file %s to S3 and/or DB" % fPath)
+    print(traceback.format_exc())
     pass
 
 
