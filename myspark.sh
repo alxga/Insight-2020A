@@ -23,7 +23,7 @@ do
 done
 
 SPARKMYREQS=".reqs4spark.zip"
-MY_REQUIREMENTS="common"
+MY_REQUIREMENTS="common transitfeed"
 
 zip_my_requirements()
 {
