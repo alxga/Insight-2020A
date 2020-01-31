@@ -2,9 +2,9 @@ import os
 import time
 import threading
 from datetime import datetime
-import requests
 import traceback
 
+import requests
 import mysql.connector
 
 from common import credentials
@@ -12,18 +12,6 @@ from common import Settings, s3, gtfsrt
 from common.queries import Queries
 
 __author__ = "Alex Ganin"
-
-
-Feeds = [
-    ("VehiclePos", "https://cdn.mbta.com/realtime/VehiclePositions.pb", 1),
-    ("TripUpdates", "https://cdn.mbta.com/realtime/TripUpdates.pb", 60),
-    ("Alerts", "https://cdn.mbta.com/realtime/Alerts.pb", 30)
-]
-
-for feedTpl in Feeds:
-  p = os.path.join(Settings.ProjPath, "pb", feedTpl[0])
-  if not os.path.exists(p):
-    os.makedirs(p)
 
 
 def push_vehpospb_dbtpl(tpl):
@@ -34,7 +22,8 @@ def push_vehpospb_dbtpl(tpl):
   try:
     cnx = mysql.connector.connect(**credentials.MySQLConnArgs)
     cursor = cnx.cursor()
-    cursor.execute(sqlStmt, tpl)
+    # cursor.execute(sqlStmt, tpl)
+    print("Skipped DB Push")
     cnx.commit()
   finally:
     if cursor:
@@ -67,18 +56,32 @@ def download_feed(dirName, url, *args):
     pass
 
 
-threads = []
-for sec in range(0, 59, 5):
+def main():
+  Feeds = [
+      ("T_VehiclePos", "https://cdn.mbta.com/realtime/VehiclePositions.pb", 5),
+      ("T_TripUpdates", "https://cdn.mbta.com/realtime/TripUpdates.pb", 60),
+      ("T_Alerts", "https://cdn.mbta.com/realtime/Alerts.pb", 30)
+  ]
+
   for feedTpl in Feeds:
-    if sec % feedTpl[2] != 0:
-      continue
-    t = threading.Thread(target=download_feed, args=feedTpl)
-    t.start()
-    threads.append(t)
-  time.sleep(5)
+    p = os.path.join(Settings.ProjPath, "pb", feedTpl[0])
+    if not os.path.exists(p):
+      os.makedirs(p)
 
-for t in threads:
-  t.join()
+  threads = []
+  for sec in range(0, 59, 5):
+    for feedTpl in Feeds:
+      if sec % feedTpl[2] != 0:
+        continue
+      t = threading.Thread(target=download_feed, args=feedTpl)
+      t.start()
+      threads.append(t)
+    time.sleep(5)
 
-print("Completed Successfully")
+  for t in threads:
+    t.join()
 
+  print("Completed Successfully")
+
+if __name__ == "__main__":
+  main()

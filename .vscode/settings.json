@@ -9,7 +9,7 @@
       "**/*.pyc": true,
       "**/*.pkl": true
     },
-    "python.pythonPath": "venvspark/bin/python",
+    "python.pythonPath": "venv/bin/python",
     "python.linting.pylintArgs": [
       "--disable=no-member",
       "--disable=invalid-name",
