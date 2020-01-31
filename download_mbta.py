@@ -69,7 +69,6 @@ def download_feed(dirName, url, *args):
 
 threads = []
 for sec in range(0, 59, 5):
-  print("Offset %d\n" % sec)
   for feedTpl in Feeds:
     if sec % feedTpl[2] != 0:
       continue
@@ -80,3 +79,6 @@ for sec in range(0, 59, 5):
 
 for t in threads:
   t.join()
+
+print("Completed Successfully")
+
