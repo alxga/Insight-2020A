@@ -43,14 +43,13 @@ class S3Mgr:
     self._Res.Object(self.bucketName, objKey).upload_file(fPath)
 
   def prefix_exists(self, prefix):
-    result = self._Client.list_objects(Bucket=self.bucketName, Prefix=prefix)
-    return result is not None
+    result = self._Client.list_objects_v2(
+        Bucket=self.bucketName, MaxKeys=1, Prefix=prefix
+    )
+    return result["KeyCount"] > 0
 
 
 def S3FeedKeyDT(objKey):
   dtval = objKey[-18:-3] # Naming assumed: 'pb/<Feed Name>/YYYYMMDD/HHMMSS.pb2'
-  if dtval[8] == '-': # TODO
-    dt = datetime.strptime(dtval, "%Y%m%d-%H%M%S")
-  else:
-    dt = datetime.strptime(dtval, "%Y%m%d/%H%M%S")
+  dt = datetime.strptime(dtval, "%Y%m%d/%H%M%S")
   return dt

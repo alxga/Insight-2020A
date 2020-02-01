@@ -37,6 +37,17 @@ def remove_enclosing_quotes(txt):
   else:
     return txt
 
+def replace_s3_invalid_characters(key):
+  spec_chars = " !-_'.,*()"
+  lst = []
+  for char in key:
+    if char.isalpha() or char.isdigit() or spec_chars.find(char) >= 0:
+      lst.append(char)
+    else:
+      lst.append('_')
+  return ''.join(lst)
+
+
 def daterange(start_date, end_date):
   deltadays = int((end_date - start_date).days)
   for n in range(deltadays):

@@ -47,14 +47,17 @@ def download_feed(dirName, url, *args):
 
     # Attempt to push records to the VehPosPb table when we're reading
     # the vehicle positions feed
-    if dirName[0:3] == "Veh":
-      tpl = gtfsrt.vehpospb_pb2_to_dbtpl(objKey, r.content)
-      push_vehpospb_dbtpl(tpl)
+    # This can be used to speed up the appearance of data in VehPos,
+    # but is disabled for now
+
+    # if dirName[0:3] == "Veh":
+    #   tpl = gtfsrt.vehpospb_pb2_to_dbtpl(objKey, r.content)
+    #   push_vehpospb_dbtpl(tpl)
 
   except Exception: # pylint: disable=broad-except
     print("Error while saving the file %s to S3 and/or DB" % fPath)
     print(traceback.format_exc())
-    pass
+    pass # do not interfere with other threads that might succeed
 
 
 def main():
@@ -81,8 +84,6 @@ def main():
 
   for t in threads:
     t.join()
-
-  print("Completed Successfully")
 
 if __name__ == "__main__":
   main()
