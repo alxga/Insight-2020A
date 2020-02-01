@@ -1,4 +1,7 @@
+from io import StringIO
 from datetime import datetime
+
+import csv
 
 from . import utils
 from . import AppEx
@@ -11,6 +14,9 @@ class MBTA_ArchivedFeedDesc:
     self.s3Key = None
     self.url = None
     self.note = None
+
+  def includesDate(self, d):
+    return self.startDate <= d and d <= self.endDate
 
 
 class MBTA_AchivedFeedsParser:
@@ -34,3 +40,15 @@ class MBTA_AchivedFeedsParser:
     if self.ixNote >= 0:
       ret.note = row[self.ixNote]
     return ret
+
+def read_feed_descs(byteStr):
+  # parse first to check if we can work with this
+  contentFile = StringIO(byteStr.decode("utf-8"))
+  reader = csv.reader(contentFile, delimiter=',')
+  parser = MBTA_AchivedFeedsParser(next(reader))
+  feedDescs = []
+  for row in reader:
+    feedDescs.append(parser.parse_row(row))
+  feedDescs.sort(key=lambda fd: fd.startDate, reverse=True)
+
+  return feedDescs

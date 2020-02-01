@@ -1,15 +1,9 @@
-# pylint: disable=unused-import
-
-import os
-import traceback
 import zipfile
 
-from io import StringIO, BytesIO
-import csv
+from io import BytesIO
 import requests
 
-from common import credentials
-from common import Settings, s3, gtfs
+from common import s3, gtfs
 
 __author__ = "Alex Ganin"
 
@@ -19,13 +13,7 @@ def update_archive_txt():
   r = requests.get(url)
 
   # parse first to check if we can work with this
-  contentFile = StringIO(r.content.decode("utf-8"))
-  reader = csv.reader(contentFile, delimiter=',')
-  parser = gtfs.MBTA_AchivedFeedsParser(next(reader))
-  feedDescs = []
-  for row in reader:
-    feedDescs.append(parser.parse_row(row))
-  feedDescs.sort(key=lambda fd: fd.startDate, reverse=True)
+  feedDescs = gtfs.read_feed_descs(r.content)
 
   objKey = '/'.join(["GTFS", "MBTA_archived_feeds.txt"])
   s3Mgr = s3.S3Mgr()

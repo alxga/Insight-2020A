@@ -4,9 +4,11 @@
 
 import os
 import sys
+from io import StringIO
 from datetime import datetime, timedelta
 from collections import namedtuple
 
+import csv
 import pytz
 import mysql.connector
 from pyspark.sql import SparkSession
@@ -16,16 +18,25 @@ from pyspark.sql.types \
 
 from transitfeed import shapelib
 from common import credentials
-from common import Settings, s3, utils, gtfsrt
+from common import Settings, s3, utils, gtfs, gtfsrt
 from common.queries import Queries
 from common.queryutils import DBConn, DBConnCommonQueries
 
 __author__ = "Alex Ganin"
 
 
-def fetch_stops_df(spark, dt):
-  _objKey = dt.strftime("%Y%m%d")
-  _objKey = '/'.join(("GTFS", "MBTA_GTFS_" + _objKey, "stops.txt"))
+def fetch_feed_descs():
+  objKey = '/'.join(["GTFS", "MBTA_archived_feeds.txt"])
+  s3Mgr = s3.S3Mgr()
+
+  content = s3Mgr.fetch_object_body(objKey)
+  feedDescs = gtfs.read_feed_descs(content)
+
+  return feedDescs
+
+
+def fetch_stops_df(spark, prefix):
+  _objKey = '/'.join([prefix, "stops.txt"])
   _objUri = "s3a://%s/%s" % (Settings.S3BucketName, _objKey)
 
   ret = spark.read.csv(_objUri, header=True)
@@ -38,9 +49,8 @@ def fetch_stops_df(spark, dt):
   return ret.filter("location_type = 0")
 
 
-def fetch_trips_df(spark, dt):
-  _objKey = dt.strftime("%Y%m%d")
-  _objKey = '/'.join(("GTFS", "MBTA_GTFS_" + _objKey, "trips.txt"))
+def fetch_trips_df(spark, prefix):
+  _objKey = '/'.join([prefix, "trips.txt"])
   _objUri = "s3a://%s/%s" % (Settings.S3BucketName, _objKey)
 
   ret = spark.read.csv(_objUri, header=True)
@@ -49,9 +59,8 @@ def fetch_trips_df(spark, dt):
   return ret.select(colNames)
 
 
-def fetch_stop_times_df(spark, dt):
-  _objKey = dt.strftime("%Y%m%d")
-  _objKey = '/'.join(("GTFS", "MBTA_GTFS_" + _objKey, "stop_times.txt"))
+def fetch_stop_times_df(spark, prefix):
+  _objKey = '/'.join([prefix, "stop_times.txt"])
   _objUri = "s3a://%s/%s" % (Settings.S3BucketName, _objKey)
 
   _schemaStopTimes = StructType([
@@ -169,17 +178,14 @@ def set_pqdate_invpdelays(D):
     con.commit()
 
 
-def run(spark):
-  with DBConnCommonQueries() as con:
-    con.create_table("VPDelays", False)
-
-  schedDT = datetime(2020, 1, 26)
+def read_joint_stop_times_df(spark, feedDesc):
+  prefix = '/'.join(["GTFS", feedDesc.s3Key])
 
   # rename some columns to disambiguate after joining the tables
-  stopsDF = fetch_stops_df(spark, schedDT) \
+  stopsDF = fetch_stops_df(spark, prefix) \
     .withColumnRenamed("stop_id", "stops_stop_id")
-  stopTimesDF = fetch_stop_times_df(spark, schedDT)
-  tripsDF = fetch_trips_df(spark, schedDT) \
+  stopTimesDF = fetch_stop_times_df(spark, prefix)
+  tripsDF = fetch_trips_df(spark, prefix) \
     .withColumnRenamed("trip_id", "trips_trip_id")
 
   stopTimesDF = stopTimesDF \
@@ -196,20 +202,40 @@ def run(spark):
     .map(lambda rec: (rec.trip_id, tuple(rec))) \
     .groupByKey()
 
+  return stopTimesRDD
+
+
+def run(spark):
+  with DBConnCommonQueries() as con:
+    con.create_table("VPDelays", False)
+
+  feedDescs = fetch_feed_descs()
+  curFeedDesc = None
+  stopTimesRDD = None
+
   targetDates = fetch_pqdts_to_update()
-
   for targetDate in targetDates:
-    objUri = "VP-" + targetDate.strftime("%Y%m%d")
-    objUri = "s3a://" + '/'.join((Settings.S3BucketName, "parquet", objUri))
-    vpDF = spark.read.parquet(objUri)
+    if stopTimesRDD is None or not curFeedDesc.includesDate(targetDate):
+      curFeedDesc = None
+      stopTimesRDD = None
+      for fd in feedDescs:
+        if fd.includesDate(targetDate):
+          curFeedDesc = fd
+          stopTimesRDD = read_joint_stop_times_df(spark, curFeedDesc)
+          break
 
-    vpRDD = vpDF.rdd \
-      .map(lambda rec: (rec.TripId, tuple(rec))) \
-      .groupByKey()
+    if stopTimesRDD:
+      objUri = "VP-" + targetDate.strftime("%Y%m%d")
+      objUri = "s3a://" + '/'.join((Settings.S3BucketName, "parquet", objUri))
+      vpDF = spark.read.parquet(objUri)
 
-    joinRDD = stopTimesRDD.join(vpRDD) \
-      .flatMap(lambda x: process_joined(targetDate, x)) \
-      .foreachPartition(push_vpdelays_dbtpls)
+      vpRDD = vpDF.rdd \
+        .map(lambda rec: (rec.TripId, tuple(rec))) \
+        .groupByKey()
+
+      joinRDD = stopTimesRDD.join(vpRDD) \
+        .flatMap(lambda x: process_joined(targetDate, x)) \
+        .foreachPartition(push_vpdelays_dbtpls)
 
     set_pqdate_invpdelays(targetDate)
 
