@@ -22,8 +22,7 @@ def push_vehpospb_dbtpl(tpl):
   try:
     cnx = mysql.connector.connect(**credentials.MySQLConnArgs)
     cursor = cnx.cursor()
-    # cursor.execute(sqlStmt, tpl)
-    print("Skipped DB Push")
+    cursor.execute(sqlStmt, tpl)
     cnx.commit()
   finally:
     if cursor:
@@ -46,7 +45,9 @@ def download_feed(dirName, url, *args):
     s3Mgr.upload_file(fPath, objKey)
     os.remove(fPath)
 
-    if dirName[0:3] == "Veh": # TODO: this is hackish
+    # Attempt to push records to the VehPosPb table when we're reading
+    # the vehicle positions feed
+    if dirName[0:3] == "Veh":
       tpl = gtfsrt.vehpospb_pb2_to_dbtpl(objKey, r.content)
       push_vehpospb_dbtpl(tpl)
 
@@ -58,7 +59,7 @@ def download_feed(dirName, url, *args):
 
 def main():
   Feeds = [
-      ("VehiclePosT", "https://cdn.mbta.com/realtime/VehiclePositions.pb", 5)
+      ("VehiclePos", "https://cdn.mbta.com/realtime/VehiclePositions.pb", 5)
   ]
 
   for feedTpl in Feeds:
