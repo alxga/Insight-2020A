@@ -12,7 +12,7 @@ from airflow.operators.bash_operator import BashOperator
 
 __author__ = "Alex Ganin"
 
-BashCmdPrefix = "~/src && "
+BashCmdPrefix = "cd ~/src && "
 
 
 default_args = {
