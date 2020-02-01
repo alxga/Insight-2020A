@@ -40,21 +40,6 @@ class DBConn:
 
 
 class DBConnCommonQueries(DBConn):
-  def fetch_dates_to_update(self, whereStmt="True"):
-    sqlStmt = """
-      SELECT DISTINCT Date(S3KeyDT) FROM VehPosPb WHERE %s;
-    """ % (whereStmt)
-    dtUtcNow = datetime.utcnow()
-
-    ret = []
-    cursor = self.execute(sqlStmt)
-    for tpl in cursor:
-      dt = tpl[0]
-      # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
-      if dtUtcNow > datetime(dt.year, dt.month, dt.day + 1, 8):
-        ret.append(dt)
-    return ret
-
   def table_exists(self, tableName):
     sqlStmt = """
       SELECT COUNT(*)

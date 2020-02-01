@@ -46,7 +46,7 @@ def fetch_keys_for_date(dt):
   with DBConn() as con:
     # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
     dt1 = datetime(dt.year, dt.month, dt.day, 8)
-    dt2 = datetime(dt.year, dt.month, dt.day + 1, 8)
+    dt2 = dt1 + timedelta(days=1)
     cur = con.execute(sqlStmt, (dt1, dt2))
     ret = []
     for tpl in cur:
