@@ -1,24 +1,18 @@
-# pylint: disable=unused-import
 # pylint: disable=unused-variable
 # pylint: disable=cell-var-from-loop
 
 import os
-import sys
-from io import StringIO
 from datetime import datetime, timedelta
 from collections import namedtuple
 
-import csv
 import pytz
-import mysql.connector
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField
-from pyspark.sql.types \
-  import StringType, TimestampType, DoubleType, IntegerType
+from pyspark.sql.types import StringType, DoubleType, IntegerType
 
 from transitfeed import shapelib
 from common import credentials
-from common import Settings, s3, utils, gtfs, gtfsrt
+from common import Settings, s3, utils, gtfs
 from common.queries import Queries
 from common.queryutils import DBConn, DBConnCommonQueries
 
@@ -28,11 +22,8 @@ __author__ = "Alex Ganin"
 def fetch_feed_descs():
   objKey = '/'.join(["GTFS", "MBTA_archived_feeds.txt"])
   s3Mgr = s3.S3Mgr()
-
   content = s3Mgr.fetch_object_body(objKey)
-  feedDescs = gtfs.read_feed_descs(content)
-
-  return feedDescs
+  return gtfs.read_feed_descs(content)
 
 
 def fetch_stops_df(spark, prefix):
@@ -212,14 +203,15 @@ def run(spark):
   feedDescs = fetch_feed_descs()
   curFeedDesc = None
   stopTimesRDD = None
+  feedRequiredFiles = ["stops.txt", "stop_times.txt", "trips.txt"]
 
-  targetDates = fetch_pqdts_to_update()
-  for targetDate in targetDates:
+  for targetDate in fetch_pqdts_to_update():
+
     if stopTimesRDD is None or not curFeedDesc.includesDate(targetDate):
       curFeedDesc = None
       stopTimesRDD = None
       for fd in feedDescs:
-        if fd.includesDate(targetDate):
+        if fd.includesDate(targetDate) and fd.includesFiles(feedRequiredFiles):
           curFeedDesc = fd
           stopTimesRDD = read_joint_stop_times_df(spark, curFeedDesc)
           break

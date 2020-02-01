@@ -3,7 +3,7 @@ from datetime import datetime
 
 import csv
 
-from . import utils
+from . import utils, s3
 from . import AppEx
 
 class MBTA_ArchivedFeedDesc:
@@ -17,6 +17,13 @@ class MBTA_ArchivedFeedDesc:
 
   def includesDate(self, d):
     return self.startDate <= d and d <= self.endDate
+
+  def includesFiles(self, fileLst):
+    s3Mgr = s3.S3Mgr()
+    for fName in fileLst:
+      if not s3Mgr.prefix_exists('/'.join(["GTFS", self.s3Key, fName])):
+        return False
+    return True
 
 
 class MBTA_AchivedFeedsParser:
