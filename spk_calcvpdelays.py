@@ -214,7 +214,12 @@ def run(spark):
         if fd.includesDate(targetDate) and fd.includesFiles(feedRequiredFiles):
           curFeedDesc = fd
           stopTimesRDD = read_joint_stop_times_df(spark, curFeedDesc)
+          print('USING FEED "%s" for %s' % \
+                (curFeedDesc.version, targetDate.strftime("%Y-%m-%d")))
           break
+    else:
+      print('RE-USING FEED "%s" for %s' % \
+            (curFeedDesc.version, targetDate.strftime("%Y-%m-%d")))
 
     if stopTimesRDD:
       objUri = "VP-" + targetDate.strftime("%Y%m%d")
