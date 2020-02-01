@@ -58,9 +58,7 @@ def download_feed(dirName, url, *args):
 
 def main():
   Feeds = [
-      ("T_VehiclePos", "https://cdn.mbta.com/realtime/VehiclePositions.pb", 5),
-      ("T_TripUpdates", "https://cdn.mbta.com/realtime/TripUpdates.pb", 60),
-      ("T_Alerts", "https://cdn.mbta.com/realtime/Alerts.pb", 30)
+      ("VehiclePosT", "https://cdn.mbta.com/realtime/VehiclePositions.pb", 5)
   ]
 
   for feedTpl in Feeds:
@@ -76,6 +74,8 @@ def main():
       t = threading.Thread(target=download_feed, args=feedTpl)
       t.start()
       threads.append(t)
+    if sec == 55:
+      break
     time.sleep(5)
 
   for t in threads:
