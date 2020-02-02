@@ -297,8 +297,15 @@ if __name__ == "__main__":
       builder = builder.config(confKey, val)
     except KeyError:
       continue
+  appName = "CalcVPDelays"
+  if _Test_Perf:
+    appName += "_Test_Perf"
+    if _Test_Perf_Parquet:
+      appName += "_Parquet"
+    elif _Test_Perf_DB:
+      appName += "_DB"
   sparkSession = builder \
-    .appName("CalcVPDelays") \
+    .appName(appName) \
     .getOrCreate()
 
   run(sparkSession)
