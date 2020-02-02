@@ -32,7 +32,7 @@ VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s);
 SELECT
   RouteId, DT, VehicleId, TripId, Lat, Lon, Status, StopSeq, StopId
 FROM VehPos
-WHERE DT > '%s' and DT < '%s'
+WHERE DT >= '%s' and DT < '%s'
 ;
 """,
 

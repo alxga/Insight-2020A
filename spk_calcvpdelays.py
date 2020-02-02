@@ -153,8 +153,11 @@ def process_joined(targetDate, keyTpl1Tpl2):
   return calc_delays(targetDate, stopTimeLst, vehPosLst)
 
 
-def do_nothing_dbtpls(tpls):
-  print("Got %d tuples in some partition for testing" % len(tpls))
+def count_dbtpls(tpls):
+  count = 0
+  for tpl in tpls:
+    count += 1
+  print("Got %d tuples in some partition for testing" % count)
 
 def push_vpdelays_dbtpls(tpls):
   sqlStmt = Queries["insertVPDelays"]
@@ -203,17 +206,7 @@ def read_joint_stop_times_df(spark, feedDesc):
   return stopTimesRDD
 
 
-def read_vp_parquet(spark, targetDate):
-  objUri = "VP-" + targetDate.strftime("%Y%m%d")
-  objUri = "s3a://" + '/'.join((Settings.S3BucketName, "parquet", objUri))
-  vpDF = spark.read.parquet(objUri)
-
-  vpRDD = vpDF.rdd \
-    .map(lambda rec: (rec.TripId, tuple(rec)))
-  return vpRDD
-
-
-def read_vp_vehpos(spark, targetDate):
+def test_perf_db(spark, targetDate, stopTimesRDD):
   connArgs = credentials.MySQLConnArgs
 
   db_properties = {}
@@ -223,20 +216,43 @@ def read_vp_vehpos(spark, targetDate):
   db_properties['url'] = db_url
   db_properties['driver'] = "com.mysql.cj.jdbc.Driver"
 
-  sqlStmt = Queries["selectVehPos_forDate"]
+  step_td = timedelta(minutes=60)
+  num_steps = int((24 * 3600) / step_td.total_seconds())
   # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
-  dt1 = datetime(targetDate.year, targetDate.month, targetDate.day, 8)
-  dt2 = dt1 + timedelta(days=1)
-  sqlStmt = Queries["selectVehPos_forDate"] % \
-    (dt1.strftime('%Y-%m-%d %H:%M'), dt2.strftime('%Y-%m-%d %H:%M'))
-  sqlStmt = "(%s) as VP" % sqlStmt.replace(';', '')
+  dt = datetime(targetDate.year, targetDate.month, targetDate.day, 8)
+  for step in range(0, num_steps):
+    sqlStmt = Queries["selectVehPos_forDate"] % (
+        dt.strftime('%Y-%m-%d %H:%M'),
+        (dt + step_td).strftime('%Y-%m-%d %H:%M')
+    )
+    sqlStmt = "(%s) as VP" % sqlStmt.replace(';', '')
 
-  vpDF = spark.read.jdbc(
-      url=db_url, table=sqlStmt, properties=db_properties
-  )
-  vpRDD = vpDF.rdd \
+    vpDF = spark.read.jdbc(
+        url=db_url, table=sqlStmt, properties=db_properties
+    )
+    vpRDD = vpDF.rdd \
+      .map(lambda rec: (rec.TripId, tuple(rec))) \
+      .groupByKey()
+    joinRDD = stopTimesRDD.join(vpRDD) \
+      .flatMap(lambda x: process_joined(targetDate, x)) \
+      .foreachPartition(count_dbtpls)
+
+    dt += step_td
+
+
+def read_vp_parquet(spark, targetDate):
+  objUri = "VP-" + targetDate.strftime("%Y%m%d")
+  objUri = "s3a://" + '/'.join((Settings.S3BucketName, "parquet", objUri))
+  vpDF = spark.read.parquet(objUri)
+  return vpDF.rdd \
     .map(lambda rec: (rec.TripId, tuple(rec)))
-  return vpRDD
+
+def test_perf_parquet(spark, targetDate, stopTimesRDD):
+  vpRDD = read_vp_parquet(spark, targetDate) \
+    .groupByKey()
+  joinRDD = stopTimesRDD.join(vpRDD) \
+    .flatMap(lambda x: process_joined(targetDate, x)) \
+    .foreachPartition(count_dbtpls)
 
 
 def run(spark):
@@ -269,23 +285,20 @@ def run(spark):
             (curFeedDesc.version, targetDate.strftime("%Y-%m-%d")))
 
     if stopTimesRDD:
-
-      if not _Test_Perf:
-        vpRDD = read_vp_parquet(spark, targetDate)
-      else:
+      if _Test_Perf:
         if _Test_Perf_Parquet:
-          vpRDD = read_vp_parquet(spark, targetDate)
+          test_perf_parquet(spark, targetDate, stopTimesRDD)
         elif _Test_Perf_DB:
-          vpRDD = read_vp_vehpos(spark, targetDate)
+          test_perf_db(spark, targetDate, stopTimesRDD)
+      else:
+        vpRDD = read_vp_parquet(spark, targetDate) \
+          .groupByKey()
+        joinRDD = stopTimesRDD.join(vpRDD) \
+          .flatMap(lambda x: process_joined(targetDate, x)) \
+          .foreachPartition(push_vpdelays_dbtpls)
 
-      vpRDD = vpRDD.groupByKey()
-
-      func = push_vpdelays_dbtpls if not _Test_Perf else do_nothing_dbtpls
-      joinRDD = stopTimesRDD.join(vpRDD) \
-        .flatMap(lambda x: process_joined(targetDate, x)) \
-        .foreachPartition(func)
-
-    set_pqdate_invpdelays(targetDate)
+    if not _Test_Perf:
+      set_pqdate_invpdelays(targetDate)
 
 
 if __name__ == "__main__":
