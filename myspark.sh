@@ -23,7 +23,7 @@ do
 done
 
 SPARKMYREQS=".reqs4spark.zip"
-MY_REQUIREMENTS="common transitfeed"
+MY_REQUIREMENTS="common transitfeed spk_updatevehpospq.py"
 
 zip_my_requirements()
 {
