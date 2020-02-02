@@ -2,7 +2,7 @@
 # pylint: disable=cell-var-from-loop
 
 import os
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from collections import namedtuple
 
 import pytz
@@ -17,6 +17,10 @@ from common.queries import Queries
 from common.queryutils import DBConn, DBConnCommonQueries
 
 __author__ = "Alex Ganin"
+
+_Test_Perf = True
+_Test_Perf_Parquet = False
+_Test_Perf_DB = True
 
 
 def fetch_feed_descs():
@@ -149,6 +153,9 @@ def process_joined(targetDate, keyTpl1Tpl2):
   return calc_delays(targetDate, stopTimeLst, vehPosLst)
 
 
+def do_nothing_dbtpls(tpls):
+  print("Got %d tuples in some partition for testing" % len(tpls))
+
 def push_vpdelays_dbtpls(tpls):
   sqlStmt = Queries["insertVPDelays"]
   with DBConn() as con:
@@ -196,16 +203,56 @@ def read_joint_stop_times_df(spark, feedDesc):
   return stopTimesRDD
 
 
+def read_vp_parquet(spark, targetDate):
+  objUri = "VP-" + targetDate.strftime("%Y%m%d")
+  objUri = "s3a://" + '/'.join((Settings.S3BucketName, "parquet", objUri))
+  vpDF = spark.read.parquet(objUri)
+
+  vpRDD = vpDF.rdd \
+    .map(lambda rec: (rec.TripId, tuple(rec)))
+  return vpRDD
+
+
+def read_vp_vehpos(spark, targetDate):
+  connArgs = credentials.MySQLConnArgs
+
+  db_properties = {}
+  db_url = "jdbc:mysql://%s:3306/%s" % (connArgs["host"], connArgs["database"])
+  db_properties['user'] = connArgs["user"]
+  db_properties['password'] = connArgs["password"]
+  db_properties['url'] = db_url
+  db_properties['driver'] = "com.mysql.cj.jdbc.Driver"
+
+  sqlStmt = Queries["selectVehPos_forDate"]
+  # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
+  dt1 = datetime(targetDate.year, targetDate.month, targetDate.day, 8)
+  dt2 = dt1 + timedelta(days=1)
+  sqlStmt = Queries["selectVehPos_forDate"] % \
+    (dt1.strftime('%Y-%m-%d %H:%M'), dt2.strftime('%Y-%m-%d %H:%M'))
+  sqlStmt = "(%s) as VP" % sqlStmt.replace(';', '')
+
+  vpDF = spark.read.jdbc(
+      url=db_url, table=sqlStmt, properties=db_properties
+  )
+  vpRDD = vpDF.rdd \
+    .map(lambda rec: (rec.TripId, tuple(rec)))
+  return vpRDD
+
+
 def run(spark):
-  with DBConnCommonQueries() as con:
-    con.create_table("VPDelays", False)
+  if not _Test_Perf:
+    with DBConnCommonQueries() as con:
+      con.create_table("VPDelays", False)
 
   feedDescs = fetch_feed_descs()
   curFeedDesc = None
   stopTimesRDD = None
   feedRequiredFiles = ["stops.txt", "stop_times.txt", "trips.txt"]
 
-  for targetDate in fetch_pqdts_to_update():
+  targetDates = fetch_pqdts_to_update() if not _Test_Perf \
+    else [date(2020, 1, 20)]
+
+  for targetDate in targetDates:
 
     if stopTimesRDD is None or not curFeedDesc.includesDate(targetDate):
       curFeedDesc = None
@@ -222,17 +269,21 @@ def run(spark):
             (curFeedDesc.version, targetDate.strftime("%Y-%m-%d")))
 
     if stopTimesRDD:
-      objUri = "VP-" + targetDate.strftime("%Y%m%d")
-      objUri = "s3a://" + '/'.join((Settings.S3BucketName, "parquet", objUri))
-      vpDF = spark.read.parquet(objUri)
 
-      vpRDD = vpDF.rdd \
-        .map(lambda rec: (rec.TripId, tuple(rec))) \
-        .groupByKey()
+      if not _Test_Perf:
+        vpRDD = read_vp_parquet(spark, targetDate)
+      else:
+        if _Test_Perf_Parquet:
+          vpRDD = read_vp_parquet(spark, targetDate)
+        elif _Test_Perf_DB:
+          vpRDD = read_vp_vehpos(spark, targetDate)
 
+      vpRDD = vpRDD.groupByKey()
+
+      func = push_vpdelays_dbtpls if not _Test_Perf else do_nothing_dbtpls
       joinRDD = stopTimesRDD.join(vpRDD) \
         .flatMap(lambda x: process_joined(targetDate, x)) \
-        .foreachPartition(push_vpdelays_dbtpls)
+        .foreachPartition(func)
 
     set_pqdate_invpdelays(targetDate)
 

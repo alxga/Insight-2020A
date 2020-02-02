@@ -27,6 +27,15 @@ VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s);
 ;
 """,
 
+"selectVehPos_forDate" : """
+
+SELECT
+  RouteId, DT, VehicleId, TripId, Lat, Lon, Status, StopSeq, StopId
+FROM VehPos
+WHERE DT > '%s' and DT < '%s'
+;
+""",
+
 "createVehPosPb": """
 
 CREATE TABLE `VehPosPb`(
@@ -54,28 +63,6 @@ SELECT S3Key
 FROM VehPosPb
 WHERE NumRecs > 0 and IsInVehPos and
       S3KeyDT > %s and S3KeyDT < %s 
-;
-""",
-
-"createTU" : """
-
-CREATE TABLE `TU` (
-  `S3KeyDT` DateTime,
-  `TripId` char(50),
-  `SDate` Date,
-  `StopId` char(50),
-  `StopSeq` integer,
-  `Arrival` DateTime,
-  `Departure` DateTime
-);
-""",
-
-"insertTU": """
-
-INSERT INTO `TU` (
-  S3KeyDT, TripId, SDate, StopId, StopSeq, Arrival, Departure
-)
-VALUES (%s, %s, %s, %s, %s, %s, %s)
 ;
 """,
 

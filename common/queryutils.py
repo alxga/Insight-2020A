@@ -1,5 +1,3 @@
-from datetime import datetime
-
 import mysql.connector
 
 from .credentials import MySQLConnArgs

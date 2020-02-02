@@ -1,16 +1,12 @@
-# pylint: disable=unused-import
-
 import os
-import sys
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 
-import mysql.connector
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField
 from pyspark.sql.types \
   import StringType, TimestampType, DoubleType, IntegerType
 
-from common import credentials, s3, utils, gtfsrt, Settings
+from common import credentials, s3, gtfsrt
 from common.queries import Queries
 from common.queryutils import DBConn, DBConnCommonQueries
 
