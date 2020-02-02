@@ -20,10 +20,10 @@ import spk_updatevehpospq
 __author__ = "Alex Ganin"
 
 
-_Test_Perf = True
+_Test_Perf = False
 _Test_Perf_Parquet = False
 _Test_Perf_DB = False
-_Test_Perf_Protobuf = True
+_Test_Perf_Protobuf = False
 
 
 def fetch_feed_descs():
