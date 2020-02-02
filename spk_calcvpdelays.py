@@ -1,4 +1,3 @@
-# pylint: disable=unused-variable
 # pylint: disable=cell-var-from-loop
 
 import os
@@ -15,12 +14,16 @@ from common import credentials
 from common import Settings, s3, utils, gtfs
 from common.queries import Queries
 from common.queryutils import DBConn, DBConnCommonQueries
+# This import is to test performance using raw protobufs
+import spk_updatevehpospq
 
 __author__ = "Alex Ganin"
 
+
 _Test_Perf = True
 _Test_Perf_Parquet = False
-_Test_Perf_DB = True
+_Test_Perf_DB = False
+_Test_Perf_Protobuf = True
 
 
 def fetch_feed_descs():
@@ -77,7 +80,34 @@ def fetch_stop_times_df(spark, prefix):
   return ret.filter("time is not NULL")
 
 
-def fetch_pqdts_to_update():
+def read_joint_stop_times_df(spark, feedDesc):
+  prefix = '/'.join(["GTFS", feedDesc.s3Key])
+
+  # rename some columns to disambiguate after joining the tables
+  stopsDF = fetch_stops_df(spark, prefix) \
+    .withColumnRenamed("stop_id", "stops_stop_id")
+  stopTimesDF = fetch_stop_times_df(spark, prefix)
+  tripsDF = fetch_trips_df(spark, prefix) \
+    .withColumnRenamed("trip_id", "trips_trip_id")
+
+  stopTimesDF = stopTimesDF \
+    .join(stopsDF, stopTimesDF.stop_id == stopsDF.stops_stop_id)
+  stopTimesDF = stopTimesDF \
+    .join(tripsDF, stopTimesDF.trip_id == tripsDF.trips_trip_id)
+  colNames = [
+    "trip_id", "stop_id", "time", "stop_seq", "stop_name", "location_type",
+    "stop_lat", "stop_lon", "route_id"
+  ]
+  stopTimesDF = stopTimesDF.select(colNames)
+
+  stopTimesRDD = stopTimesDF.rdd \
+    .map(lambda rec: (rec.trip_id, tuple(rec))) \
+    .groupByKey()
+
+  return stopTimesRDD
+
+
+def fetch_pqdates_to_update():
   ret = []
   sqlStmt = Queries["selectPqDatesWhere"] % "NumRecs > 0 and not IsInVPDelays"
   with DBConn() as con:
@@ -85,6 +115,16 @@ def fetch_pqdts_to_update():
     for row in cur:
       ret.append(row[0])
   return ret
+
+
+def set_pqdate_invpdelays(D):
+  sqlStmt = """
+    UPDATE `PqDates` SET `IsInVPDelays` = True
+    WHERE D = '%s';
+  """ % D.strftime("%Y-%m-%d")
+  with DBConn() as con:
+    con.execute(sqlStmt)
+    con.commit()
 
 
 VehPos = namedtuple("VehPos", "trip_id DT coords")
@@ -123,7 +163,6 @@ def calc_delays(targetDate, stopTimeLst, vehPosLst):
 
 
 def process_joined(targetDate, keyTpl1Tpl2):
-  key = keyTpl1Tpl2[0]
   stopTimeRecs = keyTpl1Tpl2[1][0]
   vehPosRecs = keyTpl1Tpl2[1][1]
 
@@ -155,7 +194,7 @@ def process_joined(targetDate, keyTpl1Tpl2):
 
 def count_dbtpls(tpls):
   count = 0
-  for tpl in tpls:
+  for _ in tpls:
     count += 1
   print("Got %d tuples in some partition for testing" % count)
 
@@ -169,43 +208,6 @@ def push_vpdelays_dbtpls(tpls):
     con.commit()
 
 
-def set_pqdate_invpdelays(D):
-  sqlStmt = """
-    UPDATE `PqDates` SET `IsInVPDelays` = True
-    WHERE D = '%s';
-  """ % D.strftime("%Y-%m-%d")
-  with DBConn() as con:
-    con.execute(sqlStmt)
-    con.commit()
-
-
-def read_joint_stop_times_df(spark, feedDesc):
-  prefix = '/'.join(["GTFS", feedDesc.s3Key])
-
-  # rename some columns to disambiguate after joining the tables
-  stopsDF = fetch_stops_df(spark, prefix) \
-    .withColumnRenamed("stop_id", "stops_stop_id")
-  stopTimesDF = fetch_stop_times_df(spark, prefix)
-  tripsDF = fetch_trips_df(spark, prefix) \
-    .withColumnRenamed("trip_id", "trips_trip_id")
-
-  stopTimesDF = stopTimesDF \
-    .join(stopsDF, stopTimesDF.stop_id == stopsDF.stops_stop_id)
-  stopTimesDF = stopTimesDF \
-    .join(tripsDF, stopTimesDF.trip_id == tripsDF.trips_trip_id)
-  colNames = [
-    "trip_id", "stop_id", "time", "stop_seq", "stop_name", "location_type",
-    "stop_lat", "stop_lon", "route_id"
-  ]
-  stopTimesDF = stopTimesDF.select(colNames)
-
-  stopTimesRDD = stopTimesDF.rdd \
-    .map(lambda rec: (rec.trip_id, tuple(rec))) \
-    .groupByKey()
-
-  return stopTimesRDD
-
-
 def test_perf_db(spark, targetDate, stopTimesRDD):
   connArgs = credentials.MySQLConnArgs
 
@@ -216,11 +218,11 @@ def test_perf_db(spark, targetDate, stopTimesRDD):
   db_properties['url'] = db_url
   db_properties['driver'] = "com.mysql.cj.jdbc.Driver"
 
-  step_td = timedelta(minutes=60)
+  step_td = timedelta(hours=1)
   num_steps = int((24 * 3600) / step_td.total_seconds())
   # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
   dt = datetime(targetDate.year, targetDate.month, targetDate.day, 8)
-  for step in range(0, num_steps):
+  for _ in range(0, num_steps):
     sqlStmt = Queries["selectVehPos_forDate"] % (
         dt.strftime('%Y-%m-%d %H:%M'),
         (dt + step_td).strftime('%Y-%m-%d %H:%M')
@@ -233,7 +235,7 @@ def test_perf_db(spark, targetDate, stopTimesRDD):
     vpRDD = vpDF.rdd \
       .map(lambda rec: (rec.TripId, tuple(rec))) \
       .groupByKey()
-    joinRDD = stopTimesRDD.join(vpRDD) \
+    stopTimesRDD.join(vpRDD) \
       .flatMap(lambda x: process_joined(targetDate, x)) \
       .foreachPartition(count_dbtpls)
 
@@ -250,9 +252,24 @@ def read_vp_parquet(spark, targetDate):
 def test_perf_parquet(spark, targetDate, stopTimesRDD):
   vpRDD = read_vp_parquet(spark, targetDate) \
     .groupByKey()
-  joinRDD = stopTimesRDD.join(vpRDD) \
+  stopTimesRDD.join(vpRDD) \
     .flatMap(lambda x: process_joined(targetDate, x)) \
     .foreachPartition(count_dbtpls)
+
+
+def test_perf_protobuf(spark, targetDate, stopTimesRDD):
+  keys = spk_updatevehpospq.fetch_keys_for_date(targetDate)
+  vpRDD = spark.sparkContext \
+        .parallelize(keys) \
+        .flatMap(spk_updatevehpospq.fetch_tpls) \
+        .map(lambda tpl: ((tpl[1], tpl[3]), tpl)) \
+        .reduceByKey(lambda x, y: x) \
+        .map(lambda x: (x[1][3], x[1])) \
+        .groupByKey()
+  stopTimesRDD.join(vpRDD) \
+    .flatMap(lambda x: process_joined(targetDate, x)) \
+    .foreachPartition(count_dbtpls)
+
 
 
 def run(spark):
@@ -265,7 +282,7 @@ def run(spark):
   stopTimesRDD = None
   feedRequiredFiles = ["stops.txt", "stop_times.txt", "trips.txt"]
 
-  targetDates = fetch_pqdts_to_update() if not _Test_Perf \
+  targetDates = fetch_pqdates_to_update() if not _Test_Perf \
     else [date(2020, 1, 20)]
 
   for targetDate in targetDates:
@@ -290,15 +307,18 @@ def run(spark):
           test_perf_parquet(spark, targetDate, stopTimesRDD)
         elif _Test_Perf_DB:
           test_perf_db(spark, targetDate, stopTimesRDD)
+        elif _Test_Perf_Protobuf:
+          test_perf_protobuf(spark, targetDate, stopTimesRDD)
       else:
         vpRDD = read_vp_parquet(spark, targetDate) \
           .groupByKey()
-        joinRDD = stopTimesRDD.join(vpRDD) \
+        stopTimesRDD.join(vpRDD) \
           .flatMap(lambda x: process_joined(targetDate, x)) \
           .foreachPartition(push_vpdelays_dbtpls)
 
     if not _Test_Perf:
       set_pqdate_invpdelays(targetDate)
+
 
 
 if __name__ == "__main__":
@@ -317,6 +337,8 @@ if __name__ == "__main__":
       appName += "_Parquet"
     elif _Test_Perf_DB:
       appName += "_DB"
+    elif _Test_Perf_Protobuf:
+      appName += "_Protobuf"
   sparkSession = builder \
     .appName(appName) \
     .getOrCreate()
