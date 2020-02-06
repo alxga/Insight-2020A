@@ -2,14 +2,18 @@
     "files.watcherExclude": {
       "**/.git/objects/**": true,
       "**/.git/subtree-cache/**": true,
-      "**/venv/*/**": true
+      "**/venv/*/**": true,
+      "**/venvspark/*/**": true,
+      "**/venvweb/*/**": true
     },
     "files.exclude": {
       "**/__pycache__/": true,
       "**/*.pyc": true,
-      "**/*.pkl": true
+      "**/*.pkl": true,
+      "**/venv*/": true,
+      "MBTATracker.*": true
     },
-    "python.pythonPath": "venvspark/bin/python",
+    "python.pythonPath": "/home/alxga/src/insight-2020a/venvweb/bin/python3.6",
     "python.linting.pylintArgs": [
       "--disable=no-member",
       "--disable=invalid-name",
@@ -34,5 +38,6 @@
     ],
     "python.testing.pytestEnabled": false,
     "python.testing.nosetestsEnabled": false,
-    "python.testing.unittestEnabled": true
+    "python.testing.unittestEnabled": false,
+    "python.testing.promptToConfigure": false
 }

@@ -1,14 +1,12 @@
 # pylint: disable=unused-import
 
 import os
-import sys
-from datetime import datetime, timedelta
 
 import mysql.connector
 from pyspark.sql import SparkSession
 
 from common import credentials
-from common import Settings, s3, utils, gtfsrt
+from common import s3, gtfsrt
 from common.queries import Queries
 from common.queryutils import DBConn, DBConnCommonQueries
 

@@ -24,10 +24,7 @@ default_args = {
   'email_on_retry': False,
   'retries': 0,
   'max_active_runs': 1,
-  'queue': 'sparks',
-  # 'pool': 'backfill',
-  # 'priority_weight': 10,
-  # 'end_date': datetime(2016, 1, 1),
+  'queue': 'sparks'
 }
 
 dag = DAG("ProcessMBTAHourly", default_args=default_args,

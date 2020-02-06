@@ -63,3 +63,13 @@ class DBConnCommonQueries(DBConn):
         return False
     self.execute(createSqlStmt)
     self.commit()
+
+  def count_approx(self, tableName):
+    sqlStmt = Queries["countApprox"] % tableName
+    cur = self.execute(sqlStmt)
+    return next(cur)[0]
+
+  def count_where(self, tableName, sqlWhere="True"):
+    sqlStmt = Queries["countApprox"] % (tableName, sqlWhere)
+    cur = self.execute(sqlStmt)
+    return next(cur)[0]

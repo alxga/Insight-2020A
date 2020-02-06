@@ -110,7 +110,8 @@ VALUES (%s, %s, %s)
 "selectPqDatesWhere": """
 
 SELECT D FROM `PqDates`
-WHERE %s;
+WHERE %s
+;
 """,
 
 "createVPDelays": """
@@ -139,6 +140,20 @@ INSERT INTO `VPDelays` (
   EstLat, EstLon, EstDT, EstDist, EstDelay
 )
 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+;
+""",
+
+"countApprox": """
+SELECT table_rows "Rows Count"
+FROM information_schema.tables
+WHERE table_name='%s'
+;
+""",
+
+"countWhere": """
+SELECT count(*)
+FROM `%s`
+WHERE %s
 ;
 """,
 }
