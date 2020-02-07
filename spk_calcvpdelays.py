@@ -1,7 +1,7 @@
 # pylint: disable=cell-var-from-loop
 
 import os
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from collections import namedtuple
 
 import pytz
@@ -17,7 +17,6 @@ from common.queries import Queries
 from common.queryutils import DBConn, DBConnCommonQueries
 
 __author__ = "Alex Ganin"
-
 
 
 class VPDelaysCalculator:
@@ -149,14 +148,14 @@ class HlyDelaysCalculator:
   TableSchema = StructType([
     StructField("DateEST", DateType(), False),
     StructField("HourEST", IntegerType(), False),
-    StructField("RouteId", StringType(), False),
-    StructField("StopId", StringType(), False),
-    StructField("StopName", StringType(), False),
-    StructField("StopLat", DoubleType(), False),
-    StructField("StopLon", DoubleType(), False),
-    StructField("AvgDist", DoubleType(), False),
+    StructField("RouteId", StringType(), True),
+    StructField("StopName", StringType(), True),
     StructField("AvgDelay", DoubleType(), False),
-    StructField("Cnt", IntegerType(), False)
+    StructField("AvgDist", DoubleType(), False),
+    StructField("Cnt", IntegerType(), False),
+    StructField("StopLat", DoubleType(), True),
+    StructField("StopLon", DoubleType(), True),
+    StructField("StopId", StringType(), True)
   ])
 
   DateHour = StructType([
@@ -184,6 +183,7 @@ class HlyDelaysCalculator:
           "datehour",
           udf_datetime_to_datehour(self.dfVPDelays.SchedDT)
       )
+    dfResult = dfResult.filter("EstDist < 100")
     dfResult = dfResult \
       .withColumn("DateEST", dfResult.datehour.DateEST) \
       .withColumn("HourEST", dfResult.datehour.HourEST) \
@@ -194,18 +194,34 @@ class HlyDelaysCalculator:
           dfResult.RouteId, dfResult.StopName
       ) \
       .agg(
-            dfResult.DateEST, dfResult.HourEST,
-            dfResult.RouteId, dfResult.StopName,
             F.mean(dfResult.EstDelay).alias("AvgDelay"),
             F.mean(dfResult.EstDist).alias("AvgDist"),
-            F.first(dfResult.StopId).alias("StopId"),
+            F.count(F.lit(1)).alias("Cnt"),
             F.first(dfResult.StopLat).alias("StopLat"),
             F.first(dfResult.StopLon).alias("StopLon"),
-            F.mean(dfResult.EstDelay).alias("AvgDist")
+            F.first(dfResult.StopId).alias("StopId")
       )
 
     return dfResult
 
+
+  def updateDB(self, dfHlyDelays):
+    dfHlyDelays.foreachPartition(VPDelaysCalculator._push_vpdelays_dbtpls)
+
+  @staticmethod
+  def _push_hlydelays_dbtpls(rows):
+    sqlStmt = Queries["insertHlyDelays"]
+    with DBConn() as con:
+      for row in rows:
+        tpl = (
+          row.DateEST, row.HourEST, row.RouteId, row.StopName,
+          row.AvgDelay, row.AvgDist, row.Cnt,
+          row.StopLat, row.StopLon, row.StopId
+        )
+        con.execute(sqlStmt, tpl)
+        if con.uncommited % 1000 == 0:
+          con.commit()
+      con.commit()
 
 
 class GTFSFetcher:
@@ -315,6 +331,7 @@ def read_vp_parquet(spark, targetDate):
 def run(spark):
   with DBConnCommonQueries() as con:
     con.create_table("VPDelays", False)
+    con.create_table("HlyDelays", False)
 
   feedDescs = GTFSFetcher.readFeedDescs()
   curFeedDesc = None
@@ -351,13 +368,9 @@ def run(spark):
 
       calcHlyDelays = HlyDelaysCalculator(spark, dfVPDelays)
       dfHlyDelays = calcHlyDelays.createResultDF()
-      dfHlyDelays.show()
 
-
-      #if not entry.IsInHlyDelays:
-      #  hlyStopTimesRDD = stopTimesRDD \
-      #    .map(lambda record: dt = dt.replace(tzinfo=pytz.timezone("US/Eastern")) \
-      #    .astimezone(pytz.UTC))
+      if not entry.IsInHlyDelays:
+        calcHlyDelays.updateDB(dfHlyDelays)
 
 
 if __name__ == "__main__":

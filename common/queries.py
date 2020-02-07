@@ -150,21 +150,21 @@ CREATE TABLE `HlyDelays` (
   `DateEST` Date NOT NULL,
   `HourEST` smallint NOT NULL,
   `RouteId` char(50) DEFAULT NULL,
-  `StopId` char(50) DEFAULT NULL,
   `StopName` char(200) DEFAULT NULL,
+  `AvgDelay` float NOT NULL
+  `AvgDist` float NOT NULL,
+  `Cnt` integer NOT NULL,
   `StopLat` float DEFAULT NULL,
   `StopLon` float DEFAULT NULL,
-  `AvgDist` float NOT NULL,
-  `AvgDelay` float NOT NULL,
-  `Cnt` integer NOT NULL
+  `StopId` char(50) DEFAULT NULL
 );
 """,
 
 "insertHlyDelays": """
 
 INSERT INTO `HlyDelays` (
-  DateEST, HourEST, RouteId, StopId, StopName, StopLat, StopLon,
-  AvgDelay, AvgDist, Cnt
+  DateEST, HourEST, RouteId, StopName, AvgDelay, AvgDist, Cnt,
+  StopLat, StopLon, StopId
 )
 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 ;
