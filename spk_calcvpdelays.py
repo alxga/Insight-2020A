@@ -187,7 +187,7 @@ class HlyDelaysCalculator:
     dfResult = dfResult \
       .withColumn("DateEST", dfResult.datehour.DateEST) \
       .withColumn("HourEST", dfResult.datehour.HourEST) \
-      .drop(columns="datehour")
+      .drop("datehour")
     dfResult = dfResult \
       .groupBy(dfResult.DateEST, dfResult.HourEST) \
       .agg(F.mean(dfResult.EstDelay).alias("AvgDelay"))
