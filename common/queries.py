@@ -149,11 +149,11 @@ VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 CREATE TABLE `HlyDelays` (
   `DateEST` Date NOT NULL,
   `HourEST` smallint NOT NULL,
-  `RouteId` char(50) NOT NULL,
-  `StopId` char(50) NOT NULL,
-  `StopName` char(200) NOT NULL,
-  `StopLat` float NOT NULL,
-  `StopLon` float NOT NULL,
+  `RouteId` char(50) DEFAULT NULL,
+  `StopId` char(50) DEFAULT NULL,
+  `StopName` char(200) DEFAULT NULL,
+  `StopLat` float DEFAULT NULL,
+  `StopLon` float DEFAULT NULL,
   `AvgDist` float NOT NULL,
   `AvgDelay` float NOT NULL,
   `Cnt` integer NOT NULL
