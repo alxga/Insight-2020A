@@ -1,0 +1,27 @@
+.dash-col {
+  margin-top: 20px;
+}
+
+.dash-label {
+  margin-bottom: 0;
+  padding-left: 1rem;
+  font-size: 100%;
+}
+
+.dash-section {
+  margin-bottom: 0;
+  font-size: 125%;
+}
+
+.page-separator {
+  height: 50px;
+}
+
+.footer-div {
+  padding-left: 40px;
+  background-color: lightgray;
+}
+
+#plot-div {
+  background-color: plum;
+}

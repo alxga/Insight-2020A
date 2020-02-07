@@ -1,9 +1,71 @@
 {% extends "base.html" %}
 {% import 'bootstrap/wtf.html' as wtf %}
 
+{% block styles %}
+  {{ super() }}
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/autocomplete.css') }}" />
+{% endblock %}
+
+{% block scripts %}
+  {{ super() }}
+  <script src="{{ url_for('static', filename='js/autocomplete.js') }}"> </script>
+  <script src="{{ url_for('static', filename='js/main.js') }}"> </script>
+{% endblock %}
+
 {% block app_content %}
-    <h1>My Flask Empty Page</h1>
-    <div>
-    {% if note %} {{ note }} {% endif %}
+  <div class="row">
+    <div class="col-12">
+      <h1> {{ appName }} </h1>
     </div>
+    <div class="col-12 page-separator">
+    </div>
+    <div class="col-3"><h3>Dashboard</h3></div>
+    <div class="col-9"><h3>Data Preview</h3></div>
+    <div class="col-3">
+      <div class="row">
+        <div class="col-12 dash-col">
+          <div class="dash-section">Chart Type</div>
+          <div>
+            <label for="ChartType" class="dash-label" style="display: none;">Chart Type</label>
+            <select id="ChartType" class="form-control custom-select">
+              <option value="Daily" @selected>Daily</option>
+              <option value="Hourly">Hourly</option>
+              <option value="Intraday">Intraday</option>
+            </select>
+          </div>
+        </div>
+        <div class="col-12 dash-col">
+          <div class="dash-section">Filters</div>
+          <div>
+            <label for="ByRoute" class="dash-label">By Route</label>
+            <select id="ByRoute" class="form-control custom-select">
+            </select>
+            <div class="autocomplete">
+              <label for="ByStop" class="dash-label">By Stop</label>
+              <input id="ByStop" type="text" class="form-control"/>
+            </div>
+            <label for="ByDOW" class="dash-label">By Day of Week</label>
+            <select id="ByDOW" class="form-control custom-select">
+            </select>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-9">
+      <div class="row">
+        <div class="col-12">
+          <div id="plot-div" class="embed-responsive embed-responsive-4by3">
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="col-12 page-separator">
+    </div>
+    <div class="col-12">
+      <div class="footer-div">
+        <h4> Alex Ganin, Insight DE, Boston, Winter, 2020 </h4>
+      </div>      
+    </div>
+  </div>
 {% endblock %}

@@ -18,8 +18,6 @@ def before_request():
 @bp.route('/', methods=['GET'])
 @bp.route('/index', methods=['GET'])
 def index():
-  noteVP = "We have approximately %d vehicle positions so far"
-  with DBConnCommonQueries() as con:
-    noteVP = noteVP % con.count_approx("VehPos")
-  return render_template('index.html', title=Settings.AppName,
-                         note=noteVP)
+  #with DBConnCommonQueries() as con:
+  #  noteVP = noteVP % con.count_approx("VehPos")
+  return render_template('index.html', appName=Settings.AppName)

@@ -10,7 +10,8 @@
       "**/__pycache__/": true,
       "**/*.pyc": true,
       "**/*.pkl": true,
-      "**/venv*/": true,
+      "**/venv/": true,
+      "**/venvspark/": true,
       "MBTATracker.*": true
     },
     "python.pythonPath": "/home/alxga/src/insight-2020a/venvweb/bin/python3.6",
@@ -39,5 +40,6 @@
     "python.testing.pytestEnabled": false,
     "python.testing.nosetestsEnabled": false,
     "python.testing.unittestEnabled": false,
-    "python.testing.promptToConfigure": false
+    "python.testing.promptToConfigure": false,
+    "css.lint.emptyRules": "ignore"
 }

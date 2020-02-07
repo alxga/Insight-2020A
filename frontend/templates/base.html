@@ -1,16 +1,16 @@
 {% extends 'bootstrap/base.html' %}
 
-{% block scripts %}
-    {{ super() }}
-{% endblock %}
+{%- block metas %}
+  {{ super() }}
+{%- endblock metas %}
 
 {% block title %}
-    {{ title }}
+  {{ appName }}
 {% endblock %}
 
 {% block content %}
-    <div class="container">
-        {# application content needs to be provided in the app_content block #}
-        {% block app_content %}{% endblock %}
-    </div>
+  <div class=container>
+  {# application content needs to be provided in the app_content block #}
+  {% block app_content %}{% endblock %}
+  </div>
 {% endblock %}
