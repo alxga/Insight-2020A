@@ -169,21 +169,17 @@ class HlyDelaysCalculator:
   def convert_datetime_to_est_datehour(dt):
     return (dt.date(), dt.hour)
 
-  @classmethod
-  def RegisterUDFs(cls):
-    cls.udf_datehour = udf(cls.convert_datetime_to_est_datehour, cls.DateHour)
-
-
   def __init__(self, spark, dfVPDelays):
     self.spark = spark
     self.dfVPDelays = dfVPDelays
 
-
   def createResultDF(self):
-    callback = self.udf_datehour
+    callback = udf(
+      HlyDelaysCalculator.convert_datetime_to_est_datehour,
+      HlyDelaysCalculator.DateHour
+    )
     dfTest = self.dfVPDelays \
-      .select(callback("SchedDT")) \
-      .alias("datehour") \
+      .select(callback("SchedDT").alias("datehour")) \
       .select("datehour.DateEST", "datehour.HourEST")
     return dfTest
 
@@ -328,13 +324,13 @@ def run(spark):
         VPDelaysCalculator(spark, targetDate, dfStopTimes, dfVehPos)
       dfVPDelays = calcVPDelays.createResultDF()
 
-      if not entry.IsInVPDelays:
-        calcVPDelays.updateDB(dfVPDelays)
+      #if not entry.IsInVPDelays:
+      #  calcVPDelays.updateDB(dfVPDelays)
 
       calcHlyDelays = HlyDelaysCalculator(spark, dfVPDelays)
       dfHlyDelays = calcHlyDelays.createResultDF()
       dfHlyDelays.show()
-      
+
 
       #if not entry.IsInHlyDelays:
       #  hlyStopTimesRDD = stopTimesRDD \
