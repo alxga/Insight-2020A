@@ -166,7 +166,9 @@ class HlyDelaysCalculator:
   ])
 
   @staticmethod
-  def convert_datetime_to_est_datehour(dt):
+  def datetime_to_datehour(dt):
+    dt = dt.replace(tzinfo=pytz.UTC) \
+        .astimezone(pytz.timezone("US/Eastern"))
     return (dt.date(), dt.hour)
 
   def __init__(self, spark, dfVPDelays):
@@ -174,16 +176,18 @@ class HlyDelaysCalculator:
     self.dfVPDelays = dfVPDelays
 
   def createResultDF(self):
-    callback = udf(
-      HlyDelaysCalculator.convert_datetime_to_est_datehour,
+    udf_datetime_to_datehour = udf(
+      HlyDelaysCalculator.datetime_to_datehour,
       HlyDelaysCalculator.DateHour
     )
     dfTest = self.dfVPDelays \
-      .select(callback("SchedDT").alias("datehour")) \
+      .withColumn(
+          "datehour",
+          udf_datetime_to_datehour(self.dfVPDelays.SchedDT)
+      ) \
       .select("datehour.DateEST", "datehour.HourEST")
     return dfTest
 
-HlyDelaysCalculator.RegisterUDFs()
 
 
 class GTFSFetcher:
