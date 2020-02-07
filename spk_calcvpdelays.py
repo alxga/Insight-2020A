@@ -5,12 +5,11 @@ from datetime import date, datetime, timedelta
 from collections import namedtuple
 
 import pytz
-from pyspark.sql.functions import udf
+from pyspark.sql import functions as F
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField
 from pyspark.sql.types import StringType, DoubleType, IntegerType, \
   DateType, TimestampType
-
 from transitfeed import shapelib
 from common import credentials
 from common import Settings, s3, utils, gtfs
@@ -176,17 +175,24 @@ class HlyDelaysCalculator:
     self.dfVPDelays = dfVPDelays
 
   def createResultDF(self):
-    udf_datetime_to_datehour = udf(
+    udf_datetime_to_datehour = F.udf(
       HlyDelaysCalculator.datetime_to_datehour,
       HlyDelaysCalculator.DateHour
     )
-    dfTest = self.dfVPDelays \
+    dfResult = self.dfVPDelays \
       .withColumn(
           "datehour",
           udf_datetime_to_datehour(self.dfVPDelays.SchedDT)
-      ) \
-      .select("datehour.DateEST", "datehour.HourEST")
-    return dfTest
+      )
+    dfResult = dfResult \
+      .withColumn("DateEST", dfResult.datehour.DateEST) \
+      .withColumn("HourEST", dfResult.datehour.HourEST) \
+      .drop(columns="datehour")
+    dfResult = dfResult \
+      .groupBy(dfResult.DateEST, dfResult.HourEST) \
+      .agg(F.mean(dfResult.EstDelay).alias("AvgDelay"))
+
+    return dfResult
 
 
 
