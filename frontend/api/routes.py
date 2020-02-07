@@ -24,14 +24,17 @@ def get_stopnames():
   routeId = request.args.get('routeId', None)
   q = request.args.get('q', '').lower()
 
-  whereStmt = "WHERE RouteId = '%s'" % routeId if routeId else ""
-  sqlStmt = """
-    SELECT DISTINCT StopName FROM VPDelays %s ORDER BY 1;
-  """ % whereStmt
+  sqlStmt = "SELECT DISTINCT StopName FROM VPDelays"
+  if routeId:
+    sqlStmt += " WHERE RouteId = %s"
+    params = (routeId,)
+  else:
+    params = None
+  sqlStmt += " ORDER BY 1;"
 
   ret = []
   with DBConn() as con:
-    cur = con.execute(sqlStmt)
+    cur = con.execute(sqlStmt, params)
     for row in cur:
       stopName = row[0].strip()
       stopNameLower = stopName.lower()

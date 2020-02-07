@@ -11,6 +11,7 @@
   border-top: none;
   z-index: 99;
   overflow: scroll;
+  overflow-x: hidden;
   background-color: #fff;
   max-height: 200px;
   /*position the autocomplete items to be the same width as the container:*/
