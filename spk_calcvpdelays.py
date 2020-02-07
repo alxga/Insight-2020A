@@ -204,6 +204,50 @@ class HlyDelaysCalculator:
 
     return dfResult
 
+  def groupRoutes(self, dfHlyDelays):
+    dfResult = dfHlyDelays \
+      .groupBy(
+          dfHlyDelays.DateEST, dfHlyDelays.HourEST, dfHlyDelays.RouteId
+      ) \
+      .agg(
+          (F.sum(dfHlyDelays.AvgDelay * dfHlyDelays.Cnt) /
+           F.sum(dfHlyDelays.Cnt)).alias("AvgDelay"),
+          (F.sum(dfHlyDelays.AvgDist * dfHlyDelays.Cnt) /
+           F.sum(dfHlyDelays.Cnt)).alias("AvgDist"),
+          F.sum(dfHlyDelays.Cnt).alias("Cnt"))
+    return dfResult
+
+  def groupStops(self, dfHlyDelays):
+    dfResult = dfHlyDelays \
+      .groupBy(
+          dfHlyDelays.DateEST, dfHlyDelays.HourEST, dfHlyDelays.StopName
+      ) \
+      .agg(
+          (F.sum(dfHlyDelays.AvgDelay * dfHlyDelays.Cnt) /
+           F.sum(dfHlyDelays.Cnt)).alias("AvgDelay"),
+          (F.sum(dfHlyDelays.AvgDist * dfHlyDelays.Cnt) /
+           F.sum(dfHlyDelays.Cnt)).alias("AvgDist"),
+          F.sum(dfHlyDelays.Cnt).alias("Cnt"),
+          F.first(dfHlyDelays.StopLat).alias("StopLat"),
+          F.first(dfHlyDelays.StopLon).alias("StopLon"),
+          F.first(dfHlyDelays.StopId).alias("StopId")
+      )
+    return dfResult
+
+  def groupAll(self, dfHlyDelays):
+    dfResult = dfHlyDelays \
+      .groupBy(
+          dfHlyDelays.DateEST, dfHlyDelays.HourEST
+      ) \
+      .agg(
+          (F.sum(dfHlyDelays.AvgDelay * dfHlyDelays.Cnt) /
+           F.sum(dfHlyDelays.Cnt)).alias("AvgDelay"),
+          (F.sum(dfHlyDelays.AvgDist * dfHlyDelays.Cnt) /
+           F.sum(dfHlyDelays.Cnt)).alias("AvgDist"),
+          F.sum(dfHlyDelays.Cnt).alias("Cnt")
+      )
+    return dfResult
+
 
   def updateDB(self, dfHlyDelays):
     dfHlyDelays.foreachPartition(HlyDelaysCalculator._push_hlydelays_dbtpls)
@@ -214,9 +258,13 @@ class HlyDelaysCalculator:
     with DBConn() as con:
       for row in rows:
         tpl = (
-          row.DateEST, row.HourEST, row.RouteId, row.StopName,
+          row.DateEST, row.HourEST,
+          getattr(row, "RouteId", None),
+          getattr(row, "StopName", None),
           row.AvgDelay, row.AvgDist, row.Cnt,
-          row.StopLat, row.StopLon, row.StopId
+          getattr(row, "StopLat", None),
+          getattr(row, "StopLon", None),
+          getattr(row, "StopId", None)
         )
         con.execute(sqlStmt, tpl)
         if con.uncommited % 1000 == 0:
@@ -357,7 +405,7 @@ def run(spark):
             (curFeedDesc.version, targetDate.strftime("%Y-%m-%d")))
 
     if dfStopTimes:
-      dfVehPos = read_vp_parquet(spark, targetDate).limit(1000)
+      dfVehPos = read_vp_parquet(spark, targetDate).limit(10000)
 
       calcVPDelays = \
         VPDelaysCalculator(spark, targetDate, dfStopTimes, dfVehPos)
@@ -368,9 +416,15 @@ def run(spark):
 
       calcHlyDelays = HlyDelaysCalculator(spark, dfVPDelays)
       dfHlyDelays = calcHlyDelays.createResultDF()
+      dfGrpRoutes = calcHlyDelays.groupRoutes(dfHlyDelays)
+      dfGrpStops = calcHlyDelays.groupStops(dfHlyDelays)
+      dfGrpAll = calcHlyDelays.groupAll(dfHlyDelays)
 
       if not entry.IsInHlyDelays:
         calcHlyDelays.updateDB(dfHlyDelays)
+        calcHlyDelays.updateDB(dfGrpRoutes)
+        calcHlyDelays.updateDB(dfGrpStops)
+        calcHlyDelays.updateDB(dfGrpAll)
 
 
 if __name__ == "__main__":
