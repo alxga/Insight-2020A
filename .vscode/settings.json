@@ -14,7 +14,7 @@
       "**/venvspark/": true,
       "MBTATracker.*": true
     },
-    "python.pythonPath": "/home/alxga/src/insight-2020a/venvweb/bin/python3.6",
+    "python.pythonPath": "venvspark/bin/python",
     "python.linting.pylintArgs": [
       "--disable=no-member",
       "--disable=invalid-name",

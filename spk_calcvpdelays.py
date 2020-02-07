@@ -7,23 +7,129 @@ from collections import namedtuple
 import pytz
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField
-from pyspark.sql.types import StringType, DoubleType, IntegerType
+from pyspark.sql.types import StringType, DoubleType, IntegerType, \
+  DateType, TimestampType
 
 from transitfeed import shapelib
 from common import credentials
 from common import Settings, s3, utils, gtfs
 from common.queries import Queries
 from common.queryutils import DBConn, DBConnCommonQueries
-# This import is to test performance using raw protobufs
-import spk_updatevehpospq
 
 __author__ = "Alex Ganin"
 
 
-_Test_Perf = False
-_Test_Perf_Parquet = False
-_Test_Perf_DB = False
-_Test_Perf_Protobuf = False
+
+class VPDelaysCalculator:
+  TableSchema = StructType([
+    StructField("D", DateType(), False),
+    StructField("RouteId", StringType(), True),
+    StructField("TripId", StringType(), False),
+    StructField("StopId", StringType(), False),
+    StructField("StopName", StringType(), True),
+    StructField("StopLat", DoubleType(), False),
+    StructField("StopLon", DoubleType(), False),
+    StructField("SchedDT", TimestampType(), False),
+    StructField("EstLat", DoubleType(), False),
+    StructField("EstLon", DoubleType(), False),
+    StructField("EstDT", TimestampType(), False),
+    StructField("EstDist", DoubleType(), False),
+    StructField("EstDelay", DoubleType(), False)
+  ])
+
+  VehPos = namedtuple("VehPos", "trip_id DT coords")
+
+
+  def __init__(self, spark, targetDate, dfStopTimes, dfVehPos):
+    self.spark = spark
+    self.targetDate = targetDate
+    self.dfStopTimes = dfStopTimes
+    self.dfVehPos = dfVehPos
+
+
+  def createResultDF(self):
+    rddStopTimes = self.dfStopTimes.rdd \
+      .map(lambda rec: (rec.trip_id, tuple(rec))) \
+      .groupByKey()
+
+    rddVehPos = self.dfVehPos.rdd \
+      .map(lambda rec: (rec.TripId, tuple(rec))) \
+      .groupByKey()
+
+    targetDate = self.targetDate
+    rddVPDelays = rddStopTimes.join(rddVehPos) \
+      .flatMap(lambda keyTpl1Tpl2:
+        VPDelaysCalculator._process_joined(targetDate, keyTpl1Tpl2))
+
+    return self.spark.createDataFrame(rddVPDelays, self.TableSchema)
+
+  @staticmethod
+  def _process_joined(targetDate, keyTpl1Tpl2):
+    stopTimeRecs = keyTpl1Tpl2[1][0]
+    vehPosRecs = keyTpl1Tpl2[1][1]
+
+    stopTimeLst = []
+    for stopTimeRec in stopTimeRecs:
+      stopTimeLst.append(dict(
+          tripId=stopTimeRec[0],
+          stopId=stopTimeRec[1],
+          stopSeq=stopTimeRec[3],
+          stopName=stopTimeRec[4],
+          routeId=stopTimeRec[8],
+          coords=shapelib.Point.FromLatLng(stopTimeRec[6], stopTimeRec[7])
+      ))
+      dt = utils.sched_time_to_dt(stopTimeRec[2], targetDate)
+      dt = dt.replace(tzinfo=pytz.timezone("US/Eastern")) \
+        .astimezone(pytz.UTC)
+      stopTimeLst[-1]["schedDT"] = dt.replace(tzinfo=None)
+
+    vehPosLst = []
+    for vehPosRec in vehPosRecs:
+      vehPosLst.append(VPDelaysCalculator.VehPos(
+          vehPosRec[3],
+          datetime.utcfromtimestamp(vehPosRec[1].timestamp()),
+          shapelib.Point.FromLatLng(vehPosRec[4], vehPosRec[5])
+      ))
+
+    return VPDelaysCalculator._calc_delays(targetDate, stopTimeLst, vehPosLst)
+
+  @staticmethod
+  def _calc_delays(targetDate, stopTimeLst, vehPosLst):
+    ret = []
+
+    for stopTime in stopTimeLst:
+      stopCoords = stopTime["coords"]
+      stopLatLon = stopCoords.ToLatLng()
+
+      curClosest = None
+      curDist = 1e10
+      for vp in vehPosLst:
+        dist = stopCoords.GetDistanceMeters(vp.coords)
+        if dist < curDist:
+          curDist = dist
+          curClosest = vp
+
+      # adjust the scheduled time for possible date mismatches
+      schedDT = stopTime["schedDT"]
+      daysDiff = round((schedDT - curClosest.DT).total_seconds() / (24 * 3600))
+      schedDT += timedelta(days=daysDiff)
+
+      vpLatLon = curClosest.coords.ToLatLng()
+      ret.append((
+          targetDate,
+          stopTime["routeId"], stopTime["tripId"], stopTime["stopId"],
+          stopTime["stopName"], stopLatLon[0], stopLatLon[1], schedDT,
+          vpLatLon[0], vpLatLon[1], curClosest.DT, curDist,
+          (curClosest.DT - schedDT).total_seconds()
+      ))
+    return ret
+
+
+
+
+
+
+PqDate = namedtuple("PqDate", "Date IsInVPDelays IsInHlyDelays")
 
 
 def fetch_feed_descs():
@@ -100,20 +206,17 @@ def read_joint_stop_times_df(spark, feedDesc):
   ]
   stopTimesDF = stopTimesDF.select(colNames)
 
-  stopTimesRDD = stopTimesDF.rdd \
-    .map(lambda rec: (rec.trip_id, tuple(rec))) \
-    .groupByKey()
-
-  return stopTimesRDD
+  return stopTimesDF
 
 
 def fetch_pqdates_to_update():
   ret = []
-  sqlStmt = Queries["selectPqDatesWhere"] % "NumRecs > 0 and not IsInVPDelays"
+  sqlStmt = Queries["selectPqDatesWhere"] %\
+    "NumRecs > 0 and (not IsInVPDelays or not IsInHlyDelays)"
   with DBConn() as con:
     cur = con.execute(sqlStmt)
     for row in cur:
-      ret.append(row[0])
+      ret.append(PqDate(row[0], row[1], row[2]))
   return ret
 
 
@@ -127,173 +230,44 @@ def set_pqdate_invpdelays(D):
     con.commit()
 
 
-VehPos = namedtuple("VehPos", "trip_id DT coords")
-
-
-def calc_delays(targetDate, stopTimeLst, vehPosLst):
-  ret = []
-
-  for stopTime in stopTimeLst:
-    stopCoords = stopTime["coords"]
-    stopLatLon = stopCoords.ToLatLng()
-
-    curClosest = None
-    curDist = 1e10
-    for vp in vehPosLst:
-      dist = stopCoords.GetDistanceMeters(vp.coords)
-      if dist < curDist:
-        curDist = dist
-        curClosest = vp
-
-    # adjust the scheduled time for possible date mismatches
-    schedDT = stopTime["schedDT"]
-    daysDiff = round((schedDT - curClosest.DT).total_seconds() / (24 * 3600))
-    schedDT += timedelta(days=daysDiff)
-
-    vpLatLon = curClosest.coords.ToLatLng()
-    ret.append((
-        targetDate,
-        stopTime["routeId"], stopTime["tripId"], stopTime["stopId"],
-        stopTime["stopName"], stopLatLon[0], stopLatLon[1], schedDT,
-        vpLatLon[0], vpLatLon[1], curClosest.DT, curDist,
-        (curClosest.DT - schedDT).total_seconds()
-    ))
-
-  return ret
-
-
-def process_joined(targetDate, keyTpl1Tpl2):
-  stopTimeRecs = keyTpl1Tpl2[1][0]
-  vehPosRecs = keyTpl1Tpl2[1][1]
-
-  stopTimeLst = []
-  for stopTimeRec in stopTimeRecs:
-    stopTimeLst.append(dict(
-        tripId=stopTimeRec[0],
-        stopId=stopTimeRec[1],
-        stopSeq=stopTimeRec[3],
-        stopName=stopTimeRec[4],
-        routeId=stopTimeRec[8],
-        coords=shapelib.Point.FromLatLng(stopTimeRec[6], stopTimeRec[7])
-    ))
-    dt = utils.sched_time_to_dt(stopTimeRec[2], targetDate)
-    dt = dt.replace(tzinfo=pytz.timezone("US/Eastern")) \
-      .astimezone(pytz.UTC)
-    stopTimeLst[-1]["schedDT"] = dt.replace(tzinfo=None)
-
-  vehPosLst = []
-  for vehPosRec in vehPosRecs:
-    vehPosLst.append(VehPos(
-        vehPosRec[3],
-        datetime.utcfromtimestamp(vehPosRec[1].timestamp()),
-        shapelib.Point.FromLatLng(vehPosRec[4], vehPosRec[5])
-    ))
-
-  return calc_delays(targetDate, stopTimeLst, vehPosLst)
-
-
-def count_dbtpls(tpls):
-  count = 0
-  for _ in tpls:
-    count += 1
-  print("Got %d tuples in some partition for testing" % count)
-
 def push_vpdelays_dbtpls(tpls):
   sqlStmt = Queries["insertVPDelays"]
   with DBConn() as con:
     for tpl in tpls:
-      con.execute(sqlStmt, tpl)
+      #con.execute(sqlStmt, tpl)
+
+      print(str(tpl.D))
+
       if con.uncommited % 1000 == 0:
         con.commit()
     con.commit()
 
 
-def test_perf_db(spark, targetDate, stopTimesRDD):
-  connArgs = credentials.MySQLConnArgs
-
-  db_properties = {}
-  db_url = "jdbc:mysql://%s:3306/%s" % (connArgs["host"], connArgs["database"])
-  db_properties['user'] = connArgs["user"]
-  db_properties['password'] = connArgs["password"]
-  db_properties['url'] = db_url
-  db_properties['driver'] = "com.mysql.cj.jdbc.Driver"
-
-  step_td = timedelta(hours=1)
-  num_steps = int((24 * 3600) / step_td.total_seconds())
-  # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
-  dt = datetime(targetDate.year, targetDate.month, targetDate.day, 8)
-  for _ in range(0, num_steps):
-    sqlStmt = Queries["selectVehPos_forDate"] % (
-        dt.strftime('%Y-%m-%d %H:%M'),
-        (dt + step_td).strftime('%Y-%m-%d %H:%M')
-    )
-    sqlStmt = "(%s) as VP" % sqlStmt.replace(';', '')
-
-    vpDF = spark.read.jdbc(
-        url=db_url, table=sqlStmt, properties=db_properties
-    )
-    vpRDD = vpDF.rdd \
-      .map(lambda rec: (rec.TripId, tuple(rec))) \
-      .groupByKey()
-    stopTimesRDD.join(vpRDD) \
-      .flatMap(lambda x: process_joined(targetDate, x)) \
-      .foreachPartition(count_dbtpls)
-
-    dt += step_td
-
-
 def read_vp_parquet(spark, targetDate):
   objUri = "VP-" + targetDate.strftime("%Y%m%d")
   objUri = "s3a://" + '/'.join((Settings.S3BucketName, "parquet", objUri))
-  vpDF = spark.read.parquet(objUri)
-  return vpDF.rdd \
-    .map(lambda rec: (rec.TripId, tuple(rec)))
-
-def test_perf_parquet(spark, targetDate, stopTimesRDD):
-  vpRDD = read_vp_parquet(spark, targetDate) \
-    .groupByKey()
-  stopTimesRDD.join(vpRDD) \
-    .flatMap(lambda x: process_joined(targetDate, x)) \
-    .foreachPartition(count_dbtpls)
-
-
-def test_perf_protobuf(spark, targetDate, stopTimesRDD):
-  keys = spk_updatevehpospq.fetch_keys_for_date(targetDate)
-  vpRDD = spark.sparkContext \
-        .parallelize(keys) \
-        .flatMap(spk_updatevehpospq.fetch_tpls) \
-        .map(lambda tpl: ((tpl[1], tpl[3]), tpl)) \
-        .reduceByKey(lambda x, y: x) \
-        .map(lambda x: (x[1][3], x[1])) \
-        .groupByKey()
-  stopTimesRDD.join(vpRDD) \
-    .flatMap(lambda x: process_joined(targetDate, x)) \
-    .foreachPartition(count_dbtpls)
-
+  return spark.read.parquet(objUri)
 
 
 def run(spark):
-  if not _Test_Perf:
-    with DBConnCommonQueries() as con:
-      con.create_table("VPDelays", False)
+  with DBConnCommonQueries() as con:
+    con.create_table("VPDelays", False)
 
   feedDescs = fetch_feed_descs()
   curFeedDesc = None
-  stopTimesRDD = None
+  dfStopTimes = None
   feedRequiredFiles = ["stops.txt", "stop_times.txt", "trips.txt"]
 
-  targetDates = fetch_pqdates_to_update() if not _Test_Perf \
-    else [date(2020, 1, 20)]
+  for entry in fetch_pqdates_to_update():
+    targetDate = entry.Date
 
-  for targetDate in targetDates:
-
-    if stopTimesRDD is None or not curFeedDesc.includesDate(targetDate):
+    if dfStopTimes is None or not curFeedDesc.includesDate(targetDate):
       curFeedDesc = None
-      stopTimesRDD = None
+      dfStopTimes = None
       for fd in feedDescs:
         if fd.includesDate(targetDate) and fd.includesFiles(feedRequiredFiles):
           curFeedDesc = fd
-          stopTimesRDD = read_joint_stop_times_df(spark, curFeedDesc)
+          dfStopTimes = read_joint_stop_times_df(spark, curFeedDesc)
           print('USING FEED "%s" for %s' % \
                 (curFeedDesc.version, targetDate.strftime("%Y-%m-%d")))
           break
@@ -301,23 +275,22 @@ def run(spark):
       print('RE-USING FEED "%s" for %s' % \
             (curFeedDesc.version, targetDate.strftime("%Y-%m-%d")))
 
-    if stopTimesRDD:
-      if _Test_Perf:
-        if _Test_Perf_Parquet:
-          test_perf_parquet(spark, targetDate, stopTimesRDD)
-        elif _Test_Perf_DB:
-          test_perf_db(spark, targetDate, stopTimesRDD)
-        elif _Test_Perf_Protobuf:
-          test_perf_protobuf(spark, targetDate, stopTimesRDD)
-      else:
-        vpRDD = read_vp_parquet(spark, targetDate) \
-          .groupByKey()
-        stopTimesRDD.join(vpRDD) \
-          .flatMap(lambda x: process_joined(targetDate, x)) \
-          .foreachPartition(push_vpdelays_dbtpls)
+    if dfStopTimes:
+      dfVehPos = read_vp_parquet(spark, targetDate).limit(1000)
 
-    if not _Test_Perf:
-      set_pqdate_invpdelays(targetDate)
+      calc = VPDelaysCalculator(spark, targetDate, dfStopTimes, dfVehPos)
+      dfVPDelays = calc.createResultDF()
+
+      dfVPDelays.foreachPartition(push_vpdelays_dbtpls)
+
+      if not entry.IsInVPDelays:
+        dfVPDelays.foreachPartition(push_vpdelays_dbtpls)
+
+      #if not entry.IsInHlyDelays:
+      #  hlyStopTimesRDD = stopTimesRDD \
+      #    .map(lambda record: dt = dt.replace(tzinfo=pytz.timezone("US/Eastern")) \
+      #    .astimezone(pytz.UTC))
+
 
 
 
@@ -331,14 +304,6 @@ if __name__ == "__main__":
     except KeyError:
       continue
   appName = "CalcVPDelays"
-  if _Test_Perf:
-    appName += "_Test_Perf"
-    if _Test_Perf_Parquet:
-      appName += "_Parquet"
-    elif _Test_Perf_DB:
-      appName += "_DB"
-    elif _Test_Perf_Protobuf:
-      appName += "_Protobuf"
   sparkSession = builder \
     .appName(appName) \
     .getOrCreate()

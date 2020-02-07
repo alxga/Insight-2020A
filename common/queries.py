@@ -94,7 +94,8 @@ CREATE TABLE `PqDates` (
   `D` Date PRIMARY KEY,
   `NumKeys` integer NOT NULL,
   `NumRecs` integer NOT NULL,
-  `IsInVPDelays` tinyint(1) DEFAULT '0'
+  `IsInVPDelays` tinyint(1) DEFAULT '0',
+  `IsInHlyDelays` tinyint(1) DEFAULT '0'
 );
 """,
 
@@ -109,7 +110,7 @@ VALUES (%s, %s, %s)
 
 "selectPqDatesWhere": """
 
-SELECT D FROM `PqDates`
+SELECT D, IsInVPDelays, IsInHlyDelays FROM `PqDates`
 WHERE %s
 ;
 """,
@@ -140,6 +141,32 @@ INSERT INTO `VPDelays` (
   EstLat, EstLon, EstDT, EstDist, EstDelay
 )
 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+;
+""",
+
+"createHlyDelays": """
+
+CREATE TABLE `HlyDelays` (
+  `DateEST` Date NOT NULL,
+  `HourEST` smallint NOT NULL,
+  `RouteId` char(50) DEFAULT NULL,
+  `StopId` char(50) NOT NULL,
+  `StopName` char(200) DEFAULT NULL,
+  `StopLat` float NOT NULL,
+  `StopLon` float NOT NULL,
+  `AvgDist` float NOT NULL,
+  `AvgDelay` float NOT NULL,
+  `Cnt` integer NOT NULL
+);
+""",
+
+"insertHlyDelays": """
+
+INSERT INTO `HlyDelays` (
+  DateEST, HourEST, RouteId, StopId, StopName, StopLat, StopLon,
+  AvgDelay, AvgDist, Cnt
+)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 ;
 """,
 
