@@ -230,14 +230,17 @@ def set_pqdate_invpdelays(D):
     con.commit()
 
 
-def push_vpdelays_dbtpls(tpls):
+def push_vpdelays_dbtpls(rows):
   sqlStmt = Queries["insertVPDelays"]
   with DBConn() as con:
-    for tpl in tpls:
-      #con.execute(sqlStmt, tpl)
-
-      print(str(tpl.D))
-
+    for row in rows:
+      tpl = (
+        row.D, row.RouteId, row.TripId, row.StopId, row.StopName,
+        row.StopLat, row.StopLon, row.SchedDT, row.EstLat, row.EstLon,
+        row.EstDT, row.EstDist, row.EstDelay
+      )
+      print(str(tpl))
+      # con.execute(sqlStmt, tpl)
       if con.uncommited % 1000 == 0:
         con.commit()
     con.commit()
