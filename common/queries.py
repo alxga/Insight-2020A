@@ -151,7 +151,7 @@ CREATE TABLE `HlyDelays` (
   `HourEST` smallint NOT NULL,
   `RouteId` char(50) DEFAULT NULL,
   `StopName` char(200) DEFAULT NULL,
-  `AvgDelay` float NOT NULL
+  `AvgDelay` float NOT NULL,
   `AvgDist` float NOT NULL,
   `Cnt` integer NOT NULL,
   `StopLat` float DEFAULT NULL,
