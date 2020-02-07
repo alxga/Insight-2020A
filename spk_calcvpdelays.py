@@ -206,7 +206,7 @@ class HlyDelaysCalculator:
 
 
   def updateDB(self, dfHlyDelays):
-    dfHlyDelays.foreachPartition(VPDelaysCalculator._push_vpdelays_dbtpls)
+    dfHlyDelays.foreachPartition(HlyDelaysCalculator._push_hlydelays_dbtpls)
 
   @staticmethod
   def _push_hlydelays_dbtpls(rows):
