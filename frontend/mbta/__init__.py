@@ -3,6 +3,6 @@
 
 from flask import Blueprint
 
-bp = Blueprint('main', __name__)
+bp = Blueprint('mbta', __name__)
 
 from . import routes

@@ -31,16 +31,17 @@ function updateCombo(selector, choice, arr) {
 
 function fillRoutes() {
   var selector = "#ByRoute";
-  $.ajax({url: "/api/routeids", success: function(data){
+  $.ajax({url: "/mbta/api/routeids", success: function(data){
     routeIds = [ NoFilterRoutes ].concat(data.items);
     updateCombo(selector, NoFilterRoutes, routeIds);
   }});
 }
 
 function updateStopsList() {
+  $("#ByStop").val('')
   routeId = $("#ByRoute").val();
   $.ajax({
-    url: "/api/stopnames",
+    url: "/mbta/api/stopnames",
     data: {
       routeId: routeId
     },
