@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 from collections import namedtuple
 
 import pytz
+from pyspark.sql.functions import udf
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField
 from pyspark.sql.types import StringType, DoubleType, IntegerType, \
@@ -62,6 +63,11 @@ class VPDelaysCalculator:
         VPDelaysCalculator._process_joined(targetDate, keyTpl1Tpl2))
 
     return self.spark.createDataFrame(rddVPDelays, self.TableSchema)
+
+
+  def updateDB(self, dfVPDelays):
+    dfVPDelays.foreachPartition(VPDelaysCalculator._push_vpdelays_dbtpls)
+
 
   @staticmethod
   def _process_joined(targetDate, keyTpl1Tpl2):
@@ -124,90 +130,142 @@ class VPDelaysCalculator:
       ))
     return ret
 
+  @staticmethod
+  def _push_vpdelays_dbtpls(rows):
+    sqlStmt = Queries["insertVPDelays"]
+    with DBConn() as con:
+      for row in rows:
+        tpl = (
+          row.D, row.RouteId, row.TripId, row.StopId, row.StopName,
+          row.StopLat, row.StopLon, row.SchedDT, row.EstLat, row.EstLon,
+          row.EstDT, row.EstDist, row.EstDelay
+        )
+        con.execute(sqlStmt, tpl)
+        if con.uncommited % 1000 == 0:
+          con.commit()
+      con.commit()
 
 
+class HlyDelaysCalculator:
+  TableSchema = StructType([
+    StructField("DateEST", DateType(), False),
+    StructField("HourEST", IntegerType(), False),
+    StructField("RouteId", StringType(), False),
+    StructField("StopId", StringType(), False),
+    StructField("StopName", StringType(), False),
+    StructField("StopLat", DoubleType(), False),
+    StructField("StopLon", DoubleType(), False),
+    StructField("AvgDist", DoubleType(), False),
+    StructField("AvgDelay", DoubleType(), False),
+    StructField("Cnt", IntegerType(), False)
+  ])
 
+  DateHour = StructType([
+    StructField("DateEST", DateType(), False),
+    StructField("HourEST", IntegerType(), False)
+  ])
+
+  @staticmethod
+  def convert_datetime_to_est_datehour(dt):
+    return (dt.date(), dt.hour)
+
+  @classmethod
+  def RegisterUDFs(cls):
+    cls.udf_datehour = udf(cls.convert_datetime_to_est_datehour, cls.DateHour)
+
+
+  def __init__(self, spark, dfVPDelays):
+    self.spark = spark
+    self.dfVPDelays = dfVPDelays
+
+
+  def createResultDF(self):
+    callback = self.udf_datehour
+    dfTest = self.dfVPDelays \
+      .select(callback("SchedDT")) \
+      .alias("datehour") \
+      .select("datehour.DateEST", "datehour.HourEST")
+    return dfTest
+
+HlyDelaysCalculator.RegisterUDFs()
+
+
+class GTFSFetcher:
+  def __init__(self, spark):
+    self.spark = spark
+
+  def _fetch_stops_df(self, prefix):
+    _objKey = '/'.join([prefix, "stops.txt"])
+    _objUri = "s3a://%s/%s" % (Settings.S3BucketName, _objKey)
+    dfStops = self.spark.read.csv(_objUri, header=True)
+    colNames = ["stop_id", "stop_name", "location_type", "stop_lat", "stop_lon"]
+    dfStops = dfStops.select(colNames) \
+      .withColumn("location_type", dfStops.location_type.cast(IntegerType())) \
+      .withColumn("stop_lat", dfStops.stop_lat.cast(DoubleType())) \
+      .withColumn("stop_lon", dfStops.stop_lon.cast(DoubleType()))
+    return dfStops.filter("location_type = 0")
+
+  def _fetch_trips_df(self, prefix):
+    _objKey = '/'.join([prefix, "trips.txt"])
+    _objUri = "s3a://%s/%s" % (Settings.S3BucketName, _objKey)
+    dfTrips = self.spark.read.csv(_objUri, header=True)
+    colNames = ["trip_id", "route_id"]
+    return dfTrips.select(colNames)
+
+  def _fetch_stop_times_df(self, prefix):
+    _objKey = '/'.join([prefix, "stop_times.txt"])
+    _objUri = "s3a://%s/%s" % (Settings.S3BucketName, _objKey)
+    _schemaStopTimes = StructType([
+      StructField("trip_id", StringType(), False),
+      StructField("stop_id", StringType(), False),
+      StructField("time", StringType(), False),
+      StructField("stop_seq", StringType(), False)
+    ])
+    dfStopTimes = self.spark.read.csv(_objUri, header=True)
+    dfStopTimes = dfStopTimes.rdd.map(lambda row: dict(
+        trip_id=row.trip_id,
+        stop_id=row.stop_id,
+        time=row.arrival_time if row.arrival_time is not None else \
+                                 row.departure_time,
+        stop_seq=row.stop_sequence)
+    )
+    dfStopTimes = self.spark \
+      .createDataFrame(dfStopTimes, schema=_schemaStopTimes)
+    dfStopTimes = dfStopTimes \
+      .withColumn("stop_seq", dfStopTimes.stop_seq.cast(IntegerType()))
+    return dfStopTimes.filter("time is not NULL")
+
+
+  def readStopTimes(self, feedDesc):
+    prefix = '/'.join(["GTFS", feedDesc.s3Key])
+
+    # rename some columns to disambiguate after joining the tables
+    dfStops = self._fetch_stops_df(prefix) \
+      .withColumnRenamed("stop_id", "stops_stop_id")
+    dfStopTimes = self._fetch_stop_times_df(prefix)
+    dfTrips = self._fetch_trips_df(prefix) \
+      .withColumnRenamed("trip_id", "trips_trip_id")
+
+    dfStopTimes = dfStopTimes \
+      .join(dfStops, dfStopTimes.stop_id == dfStops.stops_stop_id)
+    dfStopTimes = dfStopTimes \
+      .join(dfTrips, dfStopTimes.trip_id == dfTrips.trips_trip_id)
+    colNames = [
+      "trip_id", "stop_id", "time", "stop_seq", "stop_name", "location_type",
+      "stop_lat", "stop_lon", "route_id"
+    ]
+    return dfStopTimes.select(colNames)
+
+
+  @staticmethod
+  def readFeedDescs():
+    objKey = '/'.join(["GTFS", "MBTA_archived_feeds.txt"])
+    s3Mgr = s3.S3Mgr()
+    content = s3Mgr.fetch_object_body(objKey)
+    return gtfs.read_feed_descs(content)
 
 
 PqDate = namedtuple("PqDate", "Date IsInVPDelays IsInHlyDelays")
-
-
-def fetch_feed_descs():
-  objKey = '/'.join(["GTFS", "MBTA_archived_feeds.txt"])
-  s3Mgr = s3.S3Mgr()
-  content = s3Mgr.fetch_object_body(objKey)
-  return gtfs.read_feed_descs(content)
-
-
-def fetch_stops_df(spark, prefix):
-  _objKey = '/'.join([prefix, "stops.txt"])
-  _objUri = "s3a://%s/%s" % (Settings.S3BucketName, _objKey)
-
-  ret = spark.read.csv(_objUri, header=True)
-
-  colNames = ["stop_id", "stop_name", "location_type", "stop_lat", "stop_lon"]
-  ret = ret.select(colNames) \
-    .withColumn("location_type", ret.location_type.cast(IntegerType())) \
-    .withColumn("stop_lat", ret.stop_lat.cast(DoubleType())) \
-    .withColumn("stop_lon", ret.stop_lon.cast(DoubleType()))
-  return ret.filter("location_type = 0")
-
-
-def fetch_trips_df(spark, prefix):
-  _objKey = '/'.join([prefix, "trips.txt"])
-  _objUri = "s3a://%s/%s" % (Settings.S3BucketName, _objKey)
-
-  ret = spark.read.csv(_objUri, header=True)
-
-  colNames = ["trip_id", "route_id"]
-  return ret.select(colNames)
-
-
-def fetch_stop_times_df(spark, prefix):
-  _objKey = '/'.join([prefix, "stop_times.txt"])
-  _objUri = "s3a://%s/%s" % (Settings.S3BucketName, _objKey)
-
-  _schemaStopTimes = StructType([
-    StructField("trip_id", StringType(), False),
-    StructField("stop_id", StringType(), False),
-    StructField("time", StringType(), False),
-    StructField("stop_seq", StringType(), False)
-  ])
-  ret = spark.read.csv(_objUri, header=True)
-  ret = ret.rdd.map(lambda row: dict(
-      trip_id=row.trip_id,
-      stop_id=row.stop_id,
-      time=row.arrival_time if row.arrival_time is not None else \
-                               row.departure_time,
-      stop_seq=row.stop_sequence)
-  )
-  ret = spark.createDataFrame(ret, schema=_schemaStopTimes)
-  ret = ret.withColumn("stop_seq", ret.stop_seq.cast(IntegerType()))
-  return ret.filter("time is not NULL")
-
-
-def read_joint_stop_times_df(spark, feedDesc):
-  prefix = '/'.join(["GTFS", feedDesc.s3Key])
-
-  # rename some columns to disambiguate after joining the tables
-  stopsDF = fetch_stops_df(spark, prefix) \
-    .withColumnRenamed("stop_id", "stops_stop_id")
-  stopTimesDF = fetch_stop_times_df(spark, prefix)
-  tripsDF = fetch_trips_df(spark, prefix) \
-    .withColumnRenamed("trip_id", "trips_trip_id")
-
-  stopTimesDF = stopTimesDF \
-    .join(stopsDF, stopTimesDF.stop_id == stopsDF.stops_stop_id)
-  stopTimesDF = stopTimesDF \
-    .join(tripsDF, stopTimesDF.trip_id == tripsDF.trips_trip_id)
-  colNames = [
-    "trip_id", "stop_id", "time", "stop_seq", "stop_name", "location_type",
-    "stop_lat", "stop_lon", "route_id"
-  ]
-  stopTimesDF = stopTimesDF.select(colNames)
-
-  return stopTimesDF
-
 
 def fetch_pqdates_to_update():
   ret = []
@@ -230,22 +288,6 @@ def set_pqdate_invpdelays(D):
     con.commit()
 
 
-def push_vpdelays_dbtpls(rows):
-  sqlStmt = Queries["insertVPDelays"]
-  with DBConn() as con:
-    for row in rows:
-      tpl = (
-        row.D, row.RouteId, row.TripId, row.StopId, row.StopName,
-        row.StopLat, row.StopLon, row.SchedDT, row.EstLat, row.EstLon,
-        row.EstDT, row.EstDist, row.EstDelay
-      )
-      print(str(tpl))
-      # con.execute(sqlStmt, tpl)
-      if con.uncommited % 1000 == 0:
-        con.commit()
-    con.commit()
-
-
 def read_vp_parquet(spark, targetDate):
   objUri = "VP-" + targetDate.strftime("%Y%m%d")
   objUri = "s3a://" + '/'.join((Settings.S3BucketName, "parquet", objUri))
@@ -256,11 +298,12 @@ def run(spark):
   with DBConnCommonQueries() as con:
     con.create_table("VPDelays", False)
 
-  feedDescs = fetch_feed_descs()
+  feedDescs = GTFSFetcher.readFeedDescs()
   curFeedDesc = None
   dfStopTimes = None
   feedRequiredFiles = ["stops.txt", "stop_times.txt", "trips.txt"]
 
+  gtfsFetcher = GTFSFetcher(spark)
   for entry in fetch_pqdates_to_update():
     targetDate = entry.Date
 
@@ -270,7 +313,7 @@ def run(spark):
       for fd in feedDescs:
         if fd.includesDate(targetDate) and fd.includesFiles(feedRequiredFiles):
           curFeedDesc = fd
-          dfStopTimes = read_joint_stop_times_df(spark, curFeedDesc)
+          dfStopTimes = gtfsFetcher.readStopTimes(curFeedDesc)
           print('USING FEED "%s" for %s' % \
                 (curFeedDesc.version, targetDate.strftime("%Y-%m-%d")))
           break
@@ -281,20 +324,22 @@ def run(spark):
     if dfStopTimes:
       dfVehPos = read_vp_parquet(spark, targetDate).limit(1000)
 
-      calc = VPDelaysCalculator(spark, targetDate, dfStopTimes, dfVehPos)
-      dfVPDelays = calc.createResultDF()
-
-      dfVPDelays.foreachPartition(push_vpdelays_dbtpls)
+      calcVPDelays = \
+        VPDelaysCalculator(spark, targetDate, dfStopTimes, dfVehPos)
+      dfVPDelays = calcVPDelays.createResultDF()
 
       if not entry.IsInVPDelays:
-        dfVPDelays.foreachPartition(push_vpdelays_dbtpls)
+        calcVPDelays.updateDB(dfVPDelays)
+
+      calcHlyDelays = HlyDelaysCalculator(spark, dfVPDelays)
+      dfHlyDelays = calcHlyDelays.createResultDF()
+      dfHlyDelays.show()
+      
 
       #if not entry.IsInHlyDelays:
       #  hlyStopTimesRDD = stopTimesRDD \
       #    .map(lambda record: dt = dt.replace(tzinfo=pytz.timezone("US/Eastern")) \
       #    .astimezone(pytz.UTC))
-
-
 
 
 if __name__ == "__main__":
