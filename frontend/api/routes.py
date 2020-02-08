@@ -13,7 +13,8 @@ def get_routeids():
   with DBConn() as con:
     cur = con.execute(sqlStmt)
     for row in cur:
-      ret.append(row[0])
+      if row[0] and row[0] != 'ALLBUSES' and row[0] != 'ALLTRAINS':
+        ret.append(row[0])
   data = {
     "items": ret
   }
@@ -29,6 +30,7 @@ def get_stopnames():
     sqlStmt += " WHERE RouteId = %s"
     params = (routeId,)
   else:
+    sqlStmt += " WHERE RouteId IS NULL"
     params = None
   sqlStmt += " ORDER BY 1;"
 
@@ -36,6 +38,8 @@ def get_stopnames():
   with DBConn() as con:
     cur = con.execute(sqlStmt, params)
     for row in cur:
+      if not row[0]:
+        continue
       stopName = row[0].strip()
       stopNameLower = stopName.lower()
       if stopNameLower.startswith(q):
