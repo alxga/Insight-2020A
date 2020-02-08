@@ -27,7 +27,7 @@ default_args = {
   'queue': 'sparks'
 }
 
-dag = DAG("ProcessMBTAHourly", default_args=default_args,
+dag = DAG("Process_MBTA_Hourly", default_args=default_args,
           schedule_interval=timedelta(hours=1),
           max_active_runs=1, catchup=False)
 
