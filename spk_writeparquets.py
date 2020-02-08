@@ -120,7 +120,7 @@ if __name__ == "__main__":
       continue
 
   sparkSession = builder \
-    .appName("MakeParquets") \
+    .appName("WriteParquets") \
     .getOrCreate()
 
   run(sparkSession)

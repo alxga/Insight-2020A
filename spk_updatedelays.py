@@ -364,6 +364,14 @@ def fetch_pqdates_to_update():
   return ret
 
 
+def delete_pqdate_from_table(D, tableName):
+  sqlStmt = """
+    DELETE FROM `%s` WHERE D = '%s';
+  """ % (tableName, D.strftime("%Y-%m-%d"))
+  with DBConn() as con:
+    con.execute(sqlStmt)
+    con.commit()
+
 def set_pqdate_flag(D, flag):
   sqlStmt = """
     UPDATE `PqDates` SET `%s` = True
@@ -416,6 +424,7 @@ def run(spark):
       dfVPDelays = calcVPDelays.createResultDF()
 
       if not entry.IsInVPDelays:
+        delete_pqdate_from_table(targetDate, "VPDelays")
         calcVPDelays.updateDB(dfVPDelays)
         set_pqdate_flag(targetDate, "IsInVPDelays")
 
@@ -426,6 +435,7 @@ def run(spark):
       dfGrpAll = calcHlyDelays.groupAll(dfHlyDelays)
 
       if not entry.IsInHlyDelays:
+        delete_pqdate_from_table(targetDate, "HlyDelays")
         calcHlyDelays.updateDB(dfHlyDelays, targetDate)
         calcHlyDelays.updateDB(dfGrpRoutes, targetDate)
         calcHlyDelays.updateDB(dfGrpStops, targetDate)
@@ -442,7 +452,7 @@ if __name__ == "__main__":
       builder = builder.config(confKey, val)
     except KeyError:
       continue
-  appName = "CalcVPDelays"
+  appName = "UpdateDelays"
   sparkSession = builder \
     .appName(appName) \
     .getOrCreate()

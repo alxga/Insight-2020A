@@ -93,7 +93,7 @@ if __name__ == "__main__":
       continue
 
   sparkSession = builder \
-    .appName("UpdateVehPosPb") \
+    .appName("IndexProtobufs") \
     .getOrCreate()
 
   run(sparkSession)
