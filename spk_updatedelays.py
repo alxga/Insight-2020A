@@ -250,20 +250,20 @@ class HlyDelaysCalculator:
     return dfResult
 
 
-  def updateDB(self, dfHlyDelays, pqDate):
+  def updateDB(self, dfHlyDelays, pqDate, noRouteVal=None):
     dfHlyDelays.foreachPartition(lambda rows:
-        HlyDelaysCalculator._push_hlydelays_dbtpls(rows, pqDate)
+        HlyDelaysCalculator._push_hlydelays_dbtpls(rows, pqDate, noRouteVal)
     )
 
   @staticmethod
-  def _push_hlydelays_dbtpls(rows, pqDate):
+  def _push_hlydelays_dbtpls(rows, pqDate, noRouteVal):
     sqlStmt = Queries["insertHlyDelays"]
     with DBConn() as con:
       for row in rows:
         tpl = (
           pqDate,
           row.DateEST, row.HourEST,
-          getattr(row, "RouteId", None),
+          getattr(row, "RouteId", noRouteVal),
           getattr(row, "StopName", None),
           row.AvgDelay, row.AvgDist, row.Cnt,
           getattr(row, "StopLat", None),
@@ -433,6 +433,12 @@ def run(spark):
       dfGrpRoutes = calcHlyDelays.groupRoutes(dfHlyDelays)
       dfGrpStops = calcHlyDelays.groupStops(dfHlyDelays)
       dfGrpAll = calcHlyDelays.groupAll(dfHlyDelays)
+      dfHlyDelaysBus = dfHlyDelays.filter(dfHlyDelays.RouteId.rlike("^[0-9]"))
+      dfHlyDelaysTrain = dfHlyDelays.filter(not dfHlyDelays.RouteId.rlike("^[0-9]"))
+      dfGrpRoutesBus = calcHlyDelays.groupRoutes(dfHlyDelaysBus)
+      dfGrpAllBus = calcHlyDelays.groupAll(dfHlyDelaysBus)
+      dfGrpRoutesTrain = calcHlyDelays.groupRoutes(dfHlyDelaysTrain)
+      dfGrpAllTrain = calcHlyDelays.groupAll(dfHlyDelaysTrain)
 
       if not entry.IsInHlyDelays:
         delete_pqdate_from_table(targetDate, "HlyDelays")
@@ -440,6 +446,10 @@ def run(spark):
         calcHlyDelays.updateDB(dfGrpRoutes, targetDate)
         calcHlyDelays.updateDB(dfGrpStops, targetDate)
         calcHlyDelays.updateDB(dfGrpAll, targetDate)
+        calcHlyDelays.updateDB(dfGrpRoutesBus, targetDate, "ALLBUSES")
+        calcHlyDelays.updateDB(dfGrpAllBus, targetDate, "ALLBUSES")
+        calcHlyDelays.updateDB(dfGrpRoutesTrain, targetDate, "ALLTRAINS")
+        calcHlyDelays.updateDB(dfGrpAllTrain, targetDate, "ALLTRAINS")
         set_pqdate_flag(targetDate, "IsInHlyDelays")
 
 
