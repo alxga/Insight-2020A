@@ -21,7 +21,6 @@ __author__ = "Alex Ganin"
 
 class VPDelaysCalculator:
   TableSchema = StructType([
-    StructField("D", DateType(), False),
     StructField("RouteId", StringType(), True),
     StructField("TripId", StringType(), False),
     StructField("StopId", StringType(), False),
@@ -39,9 +38,9 @@ class VPDelaysCalculator:
   VehPos = namedtuple("VehPos", "trip_id DT coords")
 
 
-  def __init__(self, spark, targetDate, dfStopTimes, dfVehPos):
+  def __init__(self, spark, pqDate, dfStopTimes, dfVehPos):
     self.spark = spark
-    self.targetDate = targetDate
+    self.pqDate = pqDate
     self.dfStopTimes = dfStopTimes
     self.dfVehPos = dfVehPos
 
@@ -55,20 +54,23 @@ class VPDelaysCalculator:
       .map(lambda rec: (rec.TripId, tuple(rec))) \
       .groupByKey()
 
-    targetDate = self.targetDate
+    pqDate = self.pqDate
     rddVPDelays = rddStopTimes.join(rddVehPos) \
       .flatMap(lambda keyTpl1Tpl2:
-        VPDelaysCalculator._process_joined(targetDate, keyTpl1Tpl2))
+        VPDelaysCalculator._process_joined(pqDate, keyTpl1Tpl2))
 
     return self.spark.createDataFrame(rddVPDelays, self.TableSchema)
 
 
   def updateDB(self, dfVPDelays):
-    dfVPDelays.foreachPartition(VPDelaysCalculator._push_vpdelays_dbtpls)
+    pqDate = self.pqDate
+    dfVPDelays.foreachPartition(lambda rows:
+        VPDelaysCalculator._push_vpdelays_dbtpls(rows, pqDate)
+    )
 
 
   @staticmethod
-  def _process_joined(targetDate, keyTpl1Tpl2):
+  def _process_joined(pqDate, keyTpl1Tpl2):
     stopTimeRecs = keyTpl1Tpl2[1][0]
     vehPosRecs = keyTpl1Tpl2[1][1]
 
@@ -82,7 +84,7 @@ class VPDelaysCalculator:
           routeId=stopTimeRec[8],
           coords=shapelib.Point.FromLatLng(stopTimeRec[6], stopTimeRec[7])
       ))
-      dt = utils.sched_time_to_dt(stopTimeRec[2], targetDate)
+      dt = utils.sched_time_to_dt(stopTimeRec[2], pqDate)
       dt = dt.replace(tzinfo=pytz.timezone("US/Eastern")) \
         .astimezone(pytz.UTC)
       stopTimeLst[-1]["schedDT"] = dt.replace(tzinfo=None)
@@ -95,10 +97,10 @@ class VPDelaysCalculator:
           shapelib.Point.FromLatLng(vehPosRec[4], vehPosRec[5])
       ))
 
-    return VPDelaysCalculator._calc_delays(targetDate, stopTimeLst, vehPosLst)
+    return VPDelaysCalculator._calc_delays(stopTimeLst, vehPosLst)
 
   @staticmethod
-  def _calc_delays(targetDate, stopTimeLst, vehPosLst):
+  def _calc_delays(stopTimeLst, vehPosLst):
     ret = []
 
     for stopTime in stopTimeLst:
@@ -120,7 +122,6 @@ class VPDelaysCalculator:
 
       vpLatLon = curClosest.coords.ToLatLng()
       ret.append((
-          targetDate,
           stopTime["routeId"], stopTime["tripId"], stopTime["stopId"],
           stopTime["stopName"], stopLatLon[0], stopLatLon[1], schedDT,
           vpLatLon[0], vpLatLon[1], curClosest.DT, curDist,
@@ -129,12 +130,12 @@ class VPDelaysCalculator:
     return ret
 
   @staticmethod
-  def _push_vpdelays_dbtpls(rows):
+  def _push_vpdelays_dbtpls(rows, pqDate):
     sqlStmt = Queries["insertVPDelays"]
     with DBConn() as con:
       for row in rows:
         tpl = (
-          row.D, row.RouteId, row.TripId, row.StopId, row.StopName,
+          pqDate, row.RouteId, row.TripId, row.StopId, row.StopName,
           row.StopLat, row.StopLon, row.SchedDT, row.EstLat, row.EstLon,
           row.EstDT, row.EstDist, row.EstDelay
         )
@@ -249,15 +250,18 @@ class HlyDelaysCalculator:
     return dfResult
 
 
-  def updateDB(self, dfHlyDelays):
-    dfHlyDelays.foreachPartition(HlyDelaysCalculator._push_hlydelays_dbtpls)
+  def updateDB(self, dfHlyDelays, pqDate):
+    dfHlyDelays.foreachPartition(lambda rows:
+        HlyDelaysCalculator._push_hlydelays_dbtpls(rows, pqDate)
+    )
 
   @staticmethod
-  def _push_hlydelays_dbtpls(rows):
+  def _push_hlydelays_dbtpls(rows, pqDate):
     sqlStmt = Queries["insertHlyDelays"]
     with DBConn() as con:
       for row in rows:
         tpl = (
+          pqDate,
           row.DateEST, row.HourEST,
           getattr(row, "RouteId", None),
           getattr(row, "StopName", None),
@@ -360,11 +364,11 @@ def fetch_pqdates_to_update():
   return ret
 
 
-def set_pqdate_invpdelays(D):
+def set_pqdate_flag(D, flag):
   sqlStmt = """
-    UPDATE `PqDates` SET `IsInVPDelays` = True
+    UPDATE `PqDates` SET `%s` = True
     WHERE D = '%s';
-  """ % D.strftime("%Y-%m-%d")
+  """ % (flag, D.strftime("%Y-%m-%d"))
   with DBConn() as con:
     con.execute(sqlStmt)
     con.commit()
@@ -411,8 +415,9 @@ def run(spark):
         VPDelaysCalculator(spark, targetDate, dfStopTimes, dfVehPos)
       dfVPDelays = calcVPDelays.createResultDF()
 
-      #if not entry.IsInVPDelays:
-      #  calcVPDelays.updateDB(dfVPDelays)
+      if not entry.IsInVPDelays:
+        calcVPDelays.updateDB(dfVPDelays)
+        set_pqdate_flag(targetDate, "IsInVPDelays")
 
       calcHlyDelays = HlyDelaysCalculator(spark, dfVPDelays)
       dfHlyDelays = calcHlyDelays.createResultDF()
@@ -421,10 +426,11 @@ def run(spark):
       dfGrpAll = calcHlyDelays.groupAll(dfHlyDelays)
 
       if not entry.IsInHlyDelays:
-        calcHlyDelays.updateDB(dfHlyDelays)
-        calcHlyDelays.updateDB(dfGrpRoutes)
-        calcHlyDelays.updateDB(dfGrpStops)
-        calcHlyDelays.updateDB(dfGrpAll)
+        calcHlyDelays.updateDB(dfHlyDelays, targetDate)
+        calcHlyDelays.updateDB(dfGrpRoutes, targetDate)
+        calcHlyDelays.updateDB(dfGrpStops, targetDate)
+        calcHlyDelays.updateDB(dfGrpAll, targetDate)
+        set_pqdate_flag(targetDate, "IsInHlyDelays")
 
 
 if __name__ == "__main__":

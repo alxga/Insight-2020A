@@ -147,6 +147,7 @@ VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 "createHlyDelays": """
 
 CREATE TABLE `HlyDelays` (
+  `D` Date NOT NULL,
   `DateEST` Date NOT NULL,
   `HourEST` smallint NOT NULL,
   `RouteId` char(50) DEFAULT NULL,
@@ -163,10 +164,10 @@ CREATE TABLE `HlyDelays` (
 "insertHlyDelays": """
 
 INSERT INTO `HlyDelays` (
-  DateEST, HourEST, RouteId, StopName, AvgDelay, AvgDist, Cnt,
+  D, DateEST, HourEST, RouteId, StopName, AvgDelay, AvgDist, Cnt,
   StopLat, StopLon, StopId
 )
-VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
 ;
 """,
 
