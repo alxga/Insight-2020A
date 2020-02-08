@@ -7,7 +7,7 @@ from . import bp
 @bp.route('/routeids', methods=['GET'])
 def get_routeids():
   sqlStmt = """
-    SELECT DISTINCT RouteId FROM VPDelays ORDER BY 1;
+    SELECT DISTINCT RouteId FROM HlyDelays ORDER BY 1;
   """
   ret = []
   with DBConn() as con:
@@ -24,7 +24,7 @@ def get_stopnames():
   routeId = request.args.get('routeId', None)
   q = request.args.get('q', '').lower()
 
-  sqlStmt = "SELECT DISTINCT StopName FROM VPDelays"
+  sqlStmt = "SELECT DISTINCT StopName FROM HlyDelays"
   if routeId:
     sqlStmt += " WHERE RouteId = %s"
     params = (routeId,)
