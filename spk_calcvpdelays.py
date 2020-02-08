@@ -409,7 +409,7 @@ def run(spark):
             (curFeedDesc.version, targetDate.strftime("%Y-%m-%d")))
 
     if dfStopTimes:
-      dfVehPos = read_vp_parquet(spark, targetDate).limit(10000)
+      dfVehPos = read_vp_parquet(spark, targetDate)
 
       calcVPDelays = \
         VPDelaysCalculator(spark, targetDate, dfStopTimes, dfVehPos)
