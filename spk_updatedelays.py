@@ -442,14 +442,14 @@ def run(spark):
 
       if not entry.IsInHlyDelays:
         delete_pqdate_from_table(targetDate, "HlyDelays")
-        calcHlyDelays.updateDB(dfGrpStopsBus, targetDate, "ALLBUSES")
-        calcHlyDelays.updateDB(dfGrpAllBus, targetDate, "ALLBUSES")
-        calcHlyDelays.updateDB(dfGrpStopsTrain, targetDate, "ALLTRAINS")
-        calcHlyDelays.updateDB(dfGrpAllTrain, targetDate, "ALLTRAINS")
         calcHlyDelays.updateDB(dfHlyDelays, targetDate)
         calcHlyDelays.updateDB(dfGrpRoutes, targetDate)
         calcHlyDelays.updateDB(dfGrpStops, targetDate)
         calcHlyDelays.updateDB(dfGrpAll, targetDate)
+        calcHlyDelays.updateDB(dfGrpStopsBus, targetDate, "ALLBUSES")
+        calcHlyDelays.updateDB(dfGrpAllBus, targetDate, "ALLBUSES")
+        calcHlyDelays.updateDB(dfGrpStopsTrain, targetDate, "ALLTRAINS")
+        calcHlyDelays.updateDB(dfGrpAllTrain, targetDate, "ALLTRAINS")
         set_pqdate_flag(targetDate, "IsInHlyDelays")
 
 
