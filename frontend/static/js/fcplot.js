@@ -17,7 +17,7 @@ function updatePlot(data) {
   var chart = fc.chartCartesian(yScale, d3.scaleLinear())
     .xAxisHeight('3.5em')
     .yOrient("left")
-    .xLabel('Value')
+    .xLabel('Date')
     .yLabel('Delay, seconds')
     .xDomain(xExtent(data))
     .yDomain([-300, 1800])

@@ -38,6 +38,7 @@ function Autocomplete(inp, arr) {
             /*close the list of autocompleted values,
             (or any other open lists of autocompleted values:*/
             closeAllLists();
+            _this.elem.dispatchEvent(new CustomEvent('autocomplete'));
         });
         a.appendChild(b);
         if (a.childElementCount >= MaxSuggest)
@@ -62,13 +63,13 @@ function Autocomplete(inp, arr) {
       increase the currentFocus variable:*/
       _this.currentFocus++;
       /*and and make the current item more visible:*/
-      _this.addActive(x);
+      _this.addActive(x, false);
     } else if (e.keyCode == 38) { //up
       /*If the arrow UP key is pressed,
       decrease the currentFocus variable:*/
       _this.currentFocus--;
       /*and and make the current item more visible:*/
-      _this.addActive(x);
+      _this.addActive(x, true);
     } else if (e.keyCode == 13) {
       /*If the ENTER key is pressed, prevent the form from being submitted,*/
       e.preventDefault();
@@ -76,11 +77,28 @@ function Autocomplete(inp, arr) {
         /*and simulate a click on the "active" item:*/
         if (x) x[_this.currentFocus].click();
       }
+    } else if (e.keyCode == 9) {
+      /*If the TAB key is pressed, close all suggestions*/
+      if (!closeAllLists()) {
+        _this.elem.value = '';
+        _this.elem.dispatchEvent(new CustomEvent('autocomplete'));
+      }
     }
   }
   _this.elem.addEventListener("keydown", _this.keydownHandler);
 
-  _this.addActive = function(x) {
+  _this.isScrolledIntoView = function(elem)
+  {
+      var docViewTop = 0;
+      var docViewBottom = docViewTop + elem.parentNode.clientHeight;
+
+      var elemTop = $(elem).position().top;
+      var elemBottom = elemTop + $(elem).outerHeight();
+
+      return ((elemBottom <= docViewBottom) && (elemTop >= docViewTop));
+  }
+
+  _this.addActive = function(x, alignScrollTo) {
     /*a function to classify an item as "active":*/
     if (!x) return false;
     /*start by removing the "active" class on all items:*/
@@ -91,6 +109,8 @@ function Autocomplete(inp, arr) {
       _this.currentFocus = (x.length - 1);
     /*add class "autocomplete-active":*/
     x[_this.currentFocus].classList.add("autocomplete-active");
+    if (!_this.isScrolledIntoView(x[_this.currentFocus]))
+      x[_this.currentFocus].scrollIntoView(alignScrollTo);
   }
 
   _this.removeActive = function(x) {
@@ -104,14 +124,24 @@ function Autocomplete(inp, arr) {
     /*close all autocomplete lists in the document,
     except the one passed as an argument:*/
     var x = document.getElementsByClassName("autocomplete-items");
+    var haveSelection = false;
+    var removedCount = 0;
     for (var i = 0; i < x.length; i++) {
-      if (elmnt != x[i] && elmnt != inp) {
+      if (elmnt == x[i]) {
+        haveSelection = true;
+      }
+      else if (elmnt != _this.elem) {
         x[i].parentNode.removeChild(x[i]);
+        removedCount ++;
       }
     }
+    return haveSelection || removedCount <= 0;
   }
   /*execute a function when someone clicks in the document:*/
   document.addEventListener("click", function (e) {
-      closeAllLists(e.target);
+    if (!closeAllLists(e.target)) {
+      _this.elem.value = '';
+      _this.elem.dispatchEvent(new CustomEvent('autocomplete'));
+    }
   });
 }

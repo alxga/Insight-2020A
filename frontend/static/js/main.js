@@ -4,8 +4,7 @@ SPEC_ROUTES = {
   "Trains Only": "ALLTRAINS"
 }
 const DOWVals = [
-  "", "Weekdays", "Weekends", "Mondays", "Tuesdays",
-  "Wednesdays", "Fridays", "Saturdays", "Sundays"
+  "", "Weekdays", "Weekends"
 ]
 
 var stopsAutocomplete = new Autocomplete($("#ByStop")[0], []);
@@ -99,6 +98,7 @@ $(function() {
   $("#ByRoute").change(updateStopsList);
 
   $("#ByRoute").change(updateDataAndPlot);
+  $("#ByStop")[0].addEventListener('autocomplete', updateDataAndPlot);
   $("#ByDOW").change(updateDataAndPlot);
   updateDataAndPlot();
 });
