@@ -3,13 +3,17 @@
 
 {% block styles %}
   {{ super() }}
-  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
   <link rel="stylesheet" href="{{ url_for('static', filename='css/autocomplete.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/plot.css') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
 {% endblock %}
 
 {% block scripts %}
   {{ super() }}
+  <script src="https://unpkg.com/d3/dist/d3.js"></script>
+  <script src="https://unpkg.com/d3fc/build/d3fc.js"></script>
   <script src="{{ url_for('static', filename='js/autocomplete.js') }}"> </script>
+  <script src="{{ url_for('static', filename='js/fcplot.js') }}"> </script>
   <script src="{{ url_for('static', filename='js/main.js') }}"> </script>
 {% endblock %}
 
@@ -55,7 +59,9 @@
     <div class="col-9">
       <div class="row">
         <div class="col-12">
-          <div id="plot-div" class="embed-responsive embed-responsive-4by3">
+          <div id="plot-outer-div" class="embed-responsive embed-responsive-4by3">
+            <div id="plot-div" class="embed-responsive-item">
+            </div>
           </div>
         </div>
       </div>

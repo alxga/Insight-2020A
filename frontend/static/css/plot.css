@@ -1,0 +1,25 @@
+#plot-div>svg {
+}
+
+.plot-marker {
+  stroke: #69b3a2;
+  stroke-width: 2;
+  fill: white
+}
+
+.plot-marker:hover {
+  stroke: black;
+}
+
+.tick>text {
+  font-size: 1.2em;
+  color: black;
+}
+
+d3fc-svg>svg {
+  overflow:visible !important;
+}
+
+#plot-div>.cartesian-chart {
+  padding-right: 1em;
+}

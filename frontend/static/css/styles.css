@@ -24,5 +24,8 @@
 }
 
 #plot-div {
-  background-color: plum;
+  background-color: none;
+  border-style: dotted;
+  border-width: 1px;
+  border-color: lightslategray;
 }

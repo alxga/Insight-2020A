@@ -1,4 +1,8 @@
-const NoFilterRoutes = "";
+SPEC_ROUTES = {
+  "": "",
+  "Buses Only": "ALLBUSES",
+  "Trains Only": "ALLTRAINS"
+}
 const DOWVals = [
   "", "Weekdays", "Weekends", "Mondays", "Tuesdays",
   "Wednesdays", "Fridays", "Saturdays", "Sundays"
@@ -32,14 +36,19 @@ function updateCombo(selector, choice, arr) {
 function fillRoutes() {
   var selector = "#ByRoute";
   $.ajax({url: "/mbta/api/routeids", success: function(data){
-    routeIds = [ NoFilterRoutes ].concat(data.items);
-    updateCombo(selector, NoFilterRoutes, routeIds);
+    routeIds = Object.keys(SPEC_ROUTES).concat(data.items);
+    updateCombo(selector, "", routeIds);
   }});
 }
 
 function updateStopsList() {
   $("#ByStop").val('')
+
   routeId = $("#ByRoute").val();
+  if (routeId in SPEC_ROUTES) {
+    routeId = SPEC_ROUTES[routeId]
+  }
+
   $.ajax({
     url: "/mbta/api/stopnames",
     data: {
@@ -49,6 +58,7 @@ function updateStopsList() {
       stopsAutocomplete.values = result.items;
     }
   });
+  updateDataAndPlot();
 }
 
 function fillDOW() {
@@ -57,7 +67,27 @@ function fillDOW() {
 }
 
 
-$("#ByRoute").change(updateStopsList);
+function updateDataAndPlot() {
+  routeId = $("#ByRoute").val();
+  stopName = $("#ByStop").val();
+  dayOfWeek = $("#ByDOW").val();
+
+  if (routeId in SPEC_ROUTES) {
+    routeId = SPEC_ROUTES[routeId]
+  }
+
+  $.ajax({
+    url: "/mbta/api/delays-hourly",
+    data: {
+      routeId: routeId,
+      stopName: stopName,
+      dayOfWeek: dayOfWeek
+    },
+    success: function(result){
+      updatePlot(result);
+    }
+  });
+}
 
 
 $(function() {
@@ -65,4 +95,10 @@ $(function() {
   $("#ByStop").val('')
   updateStopsList();
   fillDOW();
+
+  $("#ByRoute").change(updateStopsList);
+
+  $("#ByRoute").change(updateDataAndPlot);
+  $("#ByDOW").change(updateDataAndPlot);
+  updateDataAndPlot();
 });
