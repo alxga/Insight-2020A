@@ -2,9 +2,7 @@
     "files.watcherExclude": {
       "**/.git/objects/**": true,
       "**/.git/subtree-cache/**": true,
-      "**/venv/*/**": true,
-      "**/venvspark/*/**": true,
-      "**/venvweb/*/**": true
+      "**/venv/*/**": true
     },
     "files.exclude": {
       "**/__pycache__/": true,
@@ -15,7 +13,7 @@
       "**/venvweb/": true,
       "MBTATracker.*": true
     },
-    "python.pythonPath": "venvweb/bin/python",
+    "python.pythonPath": "venv/bin/python",
     "python.linting.pylintArgs": [
       "--disable=no-member",
       "--disable=invalid-name",
