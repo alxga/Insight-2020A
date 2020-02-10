@@ -23,7 +23,7 @@ do
 done
 
 ZIP_NAME=".reqs4spark.zip"
-PY_PACKAGES="common transitfeed spk_updatevehpospq.py"
+PY_PACKAGES="common third_party spk_updatevehpospq.py"
 
 zip_my_requirements()
 {
