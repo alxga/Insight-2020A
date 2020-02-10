@@ -3,10 +3,14 @@
 }
 
 .dash-label {
-  margin-top: 1rem;
+  margin-top: 20px;
   margin-bottom: 0;
-  padding-left: 1rem;
+  padding-left: 20px;
   font-size: 100%;
+}
+
+.dash-button {
+  margin-top: 50px;
 }
 
 .dash-section {

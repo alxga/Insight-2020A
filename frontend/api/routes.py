@@ -1,12 +1,13 @@
-# pylint: disable=unused-import
-
+from io import StringIO
 from datetime import datetime
 from collections import namedtuple
+import csv
 import pytz
-from flask import jsonify, request, url_for, g, abort
+from flask import jsonify, request, Response
 from common.queryutils import DBConn
 from .. import math
 from . import bp
+
 
 @bp.route('/routeids', methods=['GET'])
 def get_routeids():
@@ -23,6 +24,7 @@ def get_routeids():
     "items": ret
   }
   return jsonify(data)
+
 
 @bp.route('/stopnames', methods=['GET'])
 def get_stopnames():
@@ -54,12 +56,7 @@ def get_stopnames():
   return jsonify(data)
 
 
-@bp.route('/delays-hourly', methods=['GET'])
-def get_delays_hourly():
-  routeId = request.args.get('routeId', None)
-  stopName = request.args.get('stopName', None)
-  dayOfWeek = request.args.get('dayOfWeek', None)
-
+def query_delays_hourly(routeId, stopName):
   params = []
   sqlStmt = """
     SELECT DateEST, HourEST, AvgDelay, AvgDist, Cnt FROM HlyDelays WHERE
@@ -84,7 +81,7 @@ def get_delays_hourly():
 
   data = []
 
-  if len(records) > 2:
+  if len(records) >= 2:
     x = [rec.AvgDelay for rec in records]
     w = [rec.Cnt for rec in records]
     xsmoothed = math.rolling_weighted_triangle_conv(x, w, 7)
@@ -95,7 +92,40 @@ def get_delays_hourly():
         .replace(tzinfo=pytz.timezone("EST"))
       data.append({
         "dt": dt.strftime("%Y-%m-%d %H:%M:%S"),
-        "value": xsmoothed[i]
+        "value": xsmoothed[i],
+        "cnt": rec.Cnt,
+        "unweighted_value": x[i]
       })
 
-  return jsonify(data)
+  return data
+
+
+def write_delays_hourly_csv(ioObj, data):
+  writer = csv.writer(ioObj, delimiter=',')
+  columns = ["dt", "value", "cnt", "unweighted_value"]
+  writer.writerow(columns)
+  for rec in data:
+    row = []
+    for col in columns:
+      row.append(rec[col])
+    writer.writerow(row)
+
+
+@bp.route('/delays-hourly', methods=['GET'])
+def get_delays_hourly():
+  routeId = request.args.get('routeId', None)
+  stopName = request.args.get('stopName', None)
+
+  data = query_delays_hourly(routeId, stopName)
+
+  if request.accept_mimetypes["text/csv"] > \
+     request.accept_mimetypes["application/json"]:
+    resp = Response()
+    resp.headers["content_type"] = "text/csv"
+    ioObj = StringIO("")
+    write_delays_hourly_csv(ioObj, data)
+    resp.set_data(ioObj.getvalue())
+    ioObj.close()
+    return resp
+  else:
+    return jsonify(data)

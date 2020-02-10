@@ -1,129 +1,153 @@
-/*the autocomplete function takes two arguments,
-the text field element and an array of possible autocompleted values:*/
 function Autocomplete(inp, arr) {
+  /* Text autocompletion helper
+
+    The object constructor function takes as input a text field element and
+    an array of possible autocompleted values
+    Upon a selection being made or cancelled the object updates the element
+    and triggers an 'autocomplete' custom event
+  */
+  var _this = this;
+
+  // Maximum number of suggested values
   const MaxSuggest = 100;
 
-  var _this = this;
+  // Autocompletion values and the text field element
   _this.values = arr;
   _this.elem = inp;
+  // Index of the currently highlighted autocompletion suggestion if any
   _this.currentFocus = -1;
 
-  _this.showSuggestions = function(e) {
+  _this.showSuggestions = function() {
+    /* Presents a list of suggested autocompletion values */
+
     var a, b, i, val = _this.elem.value;
-    /*close any already open lists of autocompleted values*/
     closeAllLists();
     _this.currentFocus = -1;
-    /*create a DIV element that will contain the items (values):*/
-    a = document.createElement("DIV");
-    a.setAttribute("id", _this.elem.id + "autocomplete-list");
-    a.setAttribute("class", "autocomplete-items");
-    /*append the DIV element as a child of the autocomplete container:*/
+
+    // Create a DIV element that will contain the items (values)
+    a = document.createElement('DIV');
+    a.setAttribute('id', _this.elem.id + 'autocomplete-list');
+    a.setAttribute('class', 'autocomplete-items');
     _this.elem.parentNode.appendChild(a);
-    /*for each item in the array...*/
+
+    // Fill the DIV with the suggested values
     for (i = 0; i < _this.values.length; i++) {
       item = _this.values[i];
-      /*check if the item starts with the same letters as the text field value:*/
       if (item.substr(0, val.length).toUpperCase() == val.toUpperCase()) {
-        /*create a DIV element for each matching element:*/
-        b = document.createElement("DIV");
-        /*make the matching letters bold:*/
+
+        // Create a DIV element for each matching element
+        b = document.createElement('DIV');
         b.innerHTML = "<strong>" + item.substr(0, val.length) + "</strong>";
         b.innerHTML += item.substr(val.length);
-        /*insert a input field that will hold the current array item's value:*/
         b.innerHTML += "<input type='hidden' value='" + item + "'>";
-        /*execute a function when someone clicks on the item value (DIV element):*/
-        b.addEventListener("click", function(e) {
-            /*insert the value for the autocomplete text field:*/
-            _this.elem.value = this.getElementsByTagName("input")[0].value;
-            /*close the list of autocompleted values,
-            (or any other open lists of autocompleted values:*/
+        
+        // Execute a function when someone clicks on a suggested value
+        b.addEventListener('click', function() {
+            _this.elem.value = this.getElementsByTagName('input')[0].value;
             closeAllLists();
             _this.elem.dispatchEvent(new CustomEvent('autocomplete'));
         });
         a.appendChild(b);
+
         if (a.childElementCount >= MaxSuggest)
           break;
       }
     }
   }
-  _this.elem.addEventListener("input", function(e) {
-    if (_this.elem.value)
-      _this.showSuggestions(e);
+  _this.elem.addEventListener('input', function() {
+      _this.showSuggestions();
   });
-  _this.elem.addEventListener("dblclick", function(e) {
+  _this.elem.addEventListener('dblclick', function() {
     if (!_this.elem.value)
-      _this.showSuggestions(e)
+      _this.showSuggestions()
   });
 
   _this.keydownHandler = function(e) {
-    var x = document.getElementById(_this.elem.id + "autocomplete-list");
-    if (x) x = x.getElementsByTagName("div");
+    /* Handles arrow-up and arrow-down for scrolling,
+      enter to autocomplete a highlighted value, and tab to cancel the input
+    */
+
+    var x = document.getElementById(_this.elem.id + 'autocomplete-list');
+    if (x) x = x.getElementsByTagName('div');
     if (e.keyCode == 40) {
-      /*If the arrow DOWN key is pressed,
-      increase the currentFocus variable:*/
+      // If the arrow DOWN key is pressed, increase the currentFocus variable
+      // and and make the current item more visible:
       _this.currentFocus++;
-      /*and and make the current item more visible:*/
       _this.addActive(x, false);
-    } else if (e.keyCode == 38) { //up
-      /*If the arrow UP key is pressed,
-      decrease the currentFocus variable:*/
+    } else if (e.keyCode == 38) { 
+      // If the arrow DOWN key is pressed, decrease the currentFocus variable
+      // and and make the current item more visible:
       _this.currentFocus--;
-      /*and and make the current item more visible:*/
       _this.addActive(x, true);
     } else if (e.keyCode == 13) {
-      /*If the ENTER key is pressed, prevent the form from being submitted,*/
+      // If the ENTER key is pressed, prevent the form from being submitted
+      // and simulate a click on the 'active' item
       e.preventDefault();
       if (_this.currentFocus > -1) {
-        /*and simulate a click on the "active" item:*/
         if (x) x[_this.currentFocus].click();
       }
     } else if (e.keyCode == 9) {
-      /*If the TAB key is pressed, close all suggestions*/
+      // If the TAB key is pressed, close all suggestions and clear the input
+      // if there were any items, don't clear the input if the list wasn't shown
+      // in the first place
       if (!closeAllLists()) {
         _this.elem.value = '';
         _this.elem.dispatchEvent(new CustomEvent('autocomplete'));
       }
     }
   }
-  _this.elem.addEventListener("keydown", _this.keydownHandler);
+  _this.elem.addEventListener('keydown', _this.keydownHandler);
 
   _this.isScrolledIntoView = function(elem)
   {
-      var docViewTop = 0;
-      var docViewBottom = docViewTop + elem.parentNode.clientHeight;
+    /* Checks if the element is in the viewport of its parent
 
-      var elemTop = $(elem).position().top;
-      var elemBottom = elemTop + $(elem).outerHeight();
+      Returns:
+        Boolean indicating whether the element in in the viewport
+    */
 
-      return ((elemBottom <= docViewBottom) && (elemTop >= docViewTop));
+    var docViewTop = 0;
+    var docViewBottom = docViewTop + elem.parentNode.clientHeight;
+
+    var elemTop = $(elem).position().top;
+    var elemBottom = elemTop + $(elem).outerHeight();
+
+    return ((elemBottom <= docViewBottom) && (elemTop >= docViewTop));
   }
 
   _this.addActive = function(x, alignScrollTo) {
-    /*a function to classify an item as "active":*/
+    /* Highlights the currently selected suggestion */
+
     if (!x) return false;
-    /*start by removing the "active" class on all items:*/
     _this.removeActive(x);
     if (_this.currentFocus >= x.length)
       _this.currentFocus = 0;
     if (_this.currentFocus < 0)
       _this.currentFocus = (x.length - 1);
-    /*add class "autocomplete-active":*/
     x[_this.currentFocus].classList.add("autocomplete-active");
     if (!_this.isScrolledIntoView(x[_this.currentFocus]))
       x[_this.currentFocus].scrollIntoView(alignScrollTo);
   }
 
   _this.removeActive = function(x) {
-    /*a function to remove the "active" class from all autocomplete items:*/
+    /* Removes the highlighting from all suggestions */
+
     for (var i = 0; i < x.length; i++) {
-      x[i].classList.remove("autocomplete-active");
+      x[i].classList.remove('autocomplete-active');
     }
   }
 
   function closeAllLists(elmnt) {
-    /*close all autocomplete lists in the document,
-    except the one passed as an argument:*/
-    var x = document.getElementsByClassName("autocomplete-items");
+    /* Clears the list of suggestions optionally keeping one element
+
+      Args:
+        elmnt: element to keep
+
+      Returns:
+        True if an element was kept or if the list was empty
+        False otherwise
+    */
+    var x = document.getElementsByClassName('autocomplete-items');
     var haveSelection = false;
     var removedCount = 0;
     for (var i = 0; i < x.length; i++) {
@@ -137,8 +161,11 @@ function Autocomplete(inp, arr) {
     }
     return haveSelection || removedCount <= 0;
   }
-  /*execute a function when someone clicks in the document:*/
-  document.addEventListener("click", function (e) {
+
+  document.addEventListener('click', function (e) {
+    /* Handles mouse click events, clears the element if the user clicks
+      outside of the suggestions list
+    */
     if (!closeAllLists(e.target)) {
       _this.elem.value = '';
       _this.elem.dispatchEvent(new CustomEvent('autocomplete'));

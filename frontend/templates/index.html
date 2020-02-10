@@ -10,6 +10,7 @@
 
 {% block scripts %}
   {{ super() }}
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.24.0/moment.min.js"></script>
   <script src="https://unpkg.com/d3/dist/d3.js"></script>
   <script src="https://unpkg.com/d3fc/build/d3fc.js"></script>
   <script src="{{ url_for('static', filename='js/autocomplete.js') }}"> </script>
@@ -22,15 +23,14 @@
     <div class="col-12">
       <h1> {{ appName }} </h1>
     </div>
-    <div class="col-12 page-separator">
-    </div>
-    <div class="col-3"><h3>Dashboard</h3></div>
-    <div class="col-9"><h3>Data Preview</h3></div>
-    <div class="col-3">
-      <div class="row">
-        <div style="display: none" class="col-12 dash-col">
+    <div class="col-sm-3">
+      <div class="col-12 page-separator">
+      </div>      
+      <h3>Dashboard</h3>
+      
+        <div class="dash-col" style="display: none;">
           <div class="dash-section">Chart Type</div>
-          <div>
+          <div class="form-group">
             <label for="ChartType" class="dash-label" style="display: none;">Chart Type</label>
             <select id="ChartType" class="form-control custom-select">
               <option value="Daily" @selected>Daily</option>
@@ -39,29 +39,38 @@
             </select>
           </div>
         </div>
-        <div class="col-12 dash-col">
+
+        <div class="dash-col">
           <div class="dash-section">Filters</div>
-          <div>
+          <div class="form-group">
             <label for="ByRoute" class="dash-label">By Route</label>
             <select id="ByRoute" class="form-control custom-select">
             </select>
-            <div class="autocomplete">
-              <label for="ByStop" class="dash-label">By Stop</label>
-              <input id="ByStop" type="text" class="form-control"/>
-            </div>
+          </div>
+          <div class="form-group autocomplete">
+            <label for="ByStop" class="dash-label">By Stop</label>
+            <input id="ByStop" type="text" class="form-control"/>
+          </div>
+          <div class="form-group">
             <label for="ByDOW" class="dash-label">By Day of Week</label>
             <select id="ByDOW" class="form-control custom-select">
             </select>
           </div>
-        </div>
+          <button id="BtnDownload" class="btn btn-primary btn-block dash-button" type="submit">
+            Download Data
+          </button>
+          <a id="download-pseudo-link" style="display: none;"></a>
       </div>
     </div>
-    <div class="col-9">
-      <div class="row">
-        <div class="col-12">
-          <div id="plot-outer-div" class="embed-responsive embed-responsive-4by3">
-            <div id="plot-div" class="embed-responsive-item">
-            </div>
+    
+    <div class="col-sm-9">
+      <div class="col-12 page-separator">
+      </div>
+      <h3>Data Preview</h3>
+
+      <div>
+        <div id="plot-outer-div" class="embed-responsive embed-responsive-4by3">
+          <div id="plot-div" class="embed-responsive-item">
           </div>
         </div>
       </div>
