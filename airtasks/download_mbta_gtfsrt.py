@@ -8,7 +8,7 @@ import requests
 import mysql.connector
 
 from common import credentials
-from common import Settings, s3, gtfsrt
+from common import Settings, s3
 from common.queries import Queries
 
 __author__ = "Alex Ganin"

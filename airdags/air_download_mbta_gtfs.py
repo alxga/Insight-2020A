@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from airflow import DAG
 from airflow.operators.python_operator import PythonOperator
 
-import download_mbta_gtfs
+from airtasks import download_mbta_gtfs
 
 __author__ = "Alex Ganin"
 

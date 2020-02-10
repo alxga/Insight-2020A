@@ -27,25 +27,29 @@ dag = DAG("Process_MBTA_Hourly", default_args=default_args,
 
 update_vehpos_pb = BashOperator(
     task_id="index_protobufs",
-    bash_command=(BashCmdPrefix + "./myspark.sh spk_indexprotobufs.py --on-master"),
+    bash_command=(BashCmdPrefix +
+      "./myspark.sh airtasks/spk_indexprotobufs.py --on-master"),
     queue="sparks",
     dag=dag
 )
 update_vehpos = BashOperator(
     task_id="update_vehpos",
-    bash_command=(BashCmdPrefix + "./myspark.sh spk_updatevehpos.py --on-master"),
+    bash_command=(BashCmdPrefix +
+      "./myspark.sh airtasks/spk_updatevehpos.py --on-master"),
     queue="sparks",
     dag=dag
 )
 update_vehpos_pq = BashOperator(
     task_id="write_parquets",
-    bash_command=(BashCmdPrefix + "./myspark.sh spk_writeparquets.py --on-master"),
+    bash_command=(BashCmdPrefix +
+      "./myspark.sh airtasks/spk_writeparquets.py --on-master"),
     queue="sparks",
     dag=dag
 )
 calc_vp_delays = BashOperator(
     task_id="update_delays",
-    bash_command=(BashCmdPrefix + "./myspark.sh spk_updatedelays.py --on-master"),
+    bash_command=(BashCmdPrefix +
+      "./myspark.sh airtasks/spk_updatedelays.py --on-master"),
     queue="sparks",
     dag=dag
 )
