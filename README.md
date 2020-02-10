@@ -11,11 +11,11 @@ File or Package | Role
 **.vscode/** | Visual Studio Code project configuration files
 **airdags/** | Airflow task definition graphs
 **airtasks/** | Airflow tasks scripts
-**common/** | Helper classes and functions shared between worker tasks and the frontend
-**frontend/** | Front end Flask web app
+**common/** | Helper classes and functions shared among worker tasks and the frontend
+**frontend/** | Frontend Flask web app
 **third_party/** | Modified 3rd-party packages and files
 **.flaskenv** | Flask dot-environment file, defines FLASK_APP
-**.gitignore** | Path patterns ignored by Git
+**.gitignore** | Defines path patterns ignored by Git
 **air_dagbag.py** | The file should be deployed to "$AIRFLOW_HOME/dags" and modified to point to the **airdags/** folder
 **frontend_app.py** | Flask application start-up script
 **myspark.sh** | Helper Bash script to launch Spark jobs
