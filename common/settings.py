@@ -10,6 +10,7 @@ class Settings:
     """Initializes the instance"""
 
     self.AppName = "MBTA: My Best Transit App"
+    self.FooterLine = "Alex Ganin, Insight Data Engineering, Boston MA, Winter 2020"
 
     self.PyPath = os.path.abspath(os.path.dirname(__file__))
     self.ProjPath = os.path.join(self.PyPath, "..")

@@ -15,7 +15,7 @@
       "**/venvweb/": true,
       "MBTATracker.*": true
     },
-    "python.pythonPath": "venv/bin/python",
+    "python.pythonPath": "venvweb/bin/python",
     "python.linting.pylintArgs": [
       "--disable=no-member",
       "--disable=invalid-name",

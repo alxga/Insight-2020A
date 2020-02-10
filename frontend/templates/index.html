@@ -22,6 +22,12 @@
   <div class="row">
     <div class="col-12">
       <h1> {{ appName }} </h1>
+      The application collects General Transit Feed Specification (GTFS)
+      Real-Time (RT) vehicle positions feeds (every 5 seconds) and GTFS
+      schedule tables (once a day and only if there is an update) (both are
+      published by the Massachusetts Bay Transportation Authority).
+      The collected data are processed to provide hourly statistics on service
+      delays (in seconds) through this web-interface.
     </div>
     <div class="col-sm-3">
       <div class="col-12 page-separator">
@@ -56,7 +62,7 @@
             <select id="ByDOW" class="form-control custom-select">
             </select>
           </div>
-          <button id="BtnDownload" class="btn btn-primary btn-block dash-button" type="submit">
+          <button id="BtnDownload" class="btn btn-info btn-block dash-button" type="submit">
             Download Data
           </button>
           <a id="download-pseudo-link" style="display: none;"></a>
@@ -79,7 +85,7 @@
     </div>
     <div class="col-12">
       <div class="footer-div">
-        <h4> Alex Ganin, Insight DE, Boston, Winter, 2020 </h4>
+        <h5> {{ footerLine }} </h5>
       </div>      
     </div>
   </div>

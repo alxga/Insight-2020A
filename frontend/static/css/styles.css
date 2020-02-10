@@ -23,8 +23,8 @@
 }
 
 .footer-div {
+  font-style: italic;
   padding-left: 40px;
-  background-color: lightgray;
 }
 
 #plot-div {
