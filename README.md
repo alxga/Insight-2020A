@@ -16,7 +16,7 @@ File or Package | Role
 **third_party/** | Modified 3rd-party packages and files
 **.flaskenv** | Flask dot-environment file, defines FLASK_APP
 **.gitignore** | Defines path patterns ignored by Git
-**air_dagbag.py** | The file should be deployed to $AIRFLOW_HOME/dags and modified as described in the file to point to the **airdags/** folder
+**air_dagbag.py** | Allows Airflow to discover task definition graphs in the **airdags/** folder, should be deployed to $AIRFLOW_HOME/dags and modified as described in the file to point to the **airdags/** folder
 **frontend_app.py** | Flask application start-up script
 **myspark.sh** | Helper Bash script to launch Spark jobs
 
