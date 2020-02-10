@@ -1,21 +1,19 @@
 # pylint: disable=wrong-import-position
 # pylint: disable=import-outside-toplevel
 # pylint: disable=invalid-name
-# pylint: disable=unused-variable
+# pylint: disable=usused-variable
 
 import os
 from flask import Flask, request, current_app, url_for, redirect
 from flask_bootstrap import Bootstrap
-from frontend_config import Config
 
 __author__ = "Alex Ganin"
 
 
 bootstrap = Bootstrap()
 
-def create_app(config_class=Config):
+def create_app():
   app = Flask(__name__)
-  app.config.from_object(config_class)
 
   bootstrap.init_app(app)
 
