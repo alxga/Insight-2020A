@@ -19,3 +19,11 @@ File or Package | Role
 **air_dagbag.py** | The file should be deployed to "$AIRFLOW_HOME/dags" and modified to point to the **airdags/** folder
 **frontend_app.py** | Flask application start-up script
 **myspark.sh** | Helper Bash script to launch Spark jobs
+
+## Author
+
+* **Alex Ganin** - *Initial work* - [alxga](https://github.com/alxga)
+
+## License
+
+This project is licensed under the MIT License
