@@ -57,7 +57,7 @@ Stop object which has attributes such as stop_lat and stop_name.
   FormatSecondsSinceMidnight(s): Formats number of seconds past midnight into a string
 """
 
-from transitfeed.version import __version__
+from .version import __version__
 from .agency import *
 from .fareattribute import *
 from .farerule import *

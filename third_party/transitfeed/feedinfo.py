@@ -14,10 +14,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import transitfeed
+from .gtfsobjectbase import GtfsObjectBase
+from .util import ValidateLanguageCode, ValidateURL, ValidateDate, \
+  ValidateRequiredFieldsAreNotEmpty
 
 
-class FeedInfo(transitfeed.GtfsObjectBase):
+class FeedInfo(GtfsObjectBase):
   """Model and validation for feed_info.txt."""
 
   _REQUIRED_FIELD_NAMES = [
@@ -43,23 +45,23 @@ class FeedInfo(transitfeed.GtfsObjectBase):
       self.__dict__.update(field_dict)
 
   def ValidateFeedInfoLang(self, problems):
-    return not transitfeed.ValidateLanguageCode(
+    return not ValidateLanguageCode(
         self.feed_lang, "feed_lang", problems
     )
 
   def ValidateFeedInfoPublisherUrl(self, problems):
-    return not transitfeed.ValidateURL(
+    return not ValidateURL(
         self.feed_publisher_url, "feed_publisher_url", problems
     )
 
   def ValidateDates(self, problems):
     # Both validity dates are currently set to optional, thus they don't have
     # to be provided and it's currently OK to provide one but not the other.
-    start_date_valid = transitfeed.ValidateDate(
+    start_date_valid = ValidateDate(
         self.feed_start_date, "feed_start_date", problems
     )
 
-    end_date_valid = transitfeed.ValidateDate(
+    end_date_valid = ValidateDate(
         self.feed_end_date, "feed_end_date", problems
     )
 
@@ -78,7 +80,7 @@ class FeedInfo(transitfeed.GtfsObjectBase):
         )
 
   def ValidateBeforeAdd(self, problems):
-    transitfeed.ValidateRequiredFieldsAreNotEmpty(
+    ValidateRequiredFieldsAreNotEmpty(
         self, self._REQUIRED_FIELD_NAMES, problems
     )
     self.ValidateFeedInfoLang(problems)

@@ -1,4 +1,8 @@
-""" add additional DAGs folders """
+""" Add additional DAGs folders
+
+  The file should be placed into the folder $AIRFLOW_HOME/dags
+"""
+
 import os
 from airflow.models import DagBag
 dags_dirs = ['~/src/airdags']

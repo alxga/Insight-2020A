@@ -10,7 +10,7 @@ from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField
 from pyspark.sql.types import StringType, DoubleType, IntegerType, \
   DateType, TimestampType
-from transitfeed import shapelib
+from third_party.transitfeed import shapelib
 from common import credentials
 from common import Settings, s3, utils, gtfs
 from common.queries import Queries

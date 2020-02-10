@@ -607,7 +607,7 @@ def main(RequestHandlerClass=ScheduleRequestHandler):
   )
   print('Loading data from feed "%s"...' % options.feed_filename)
   print("(this may take a few minutes for larger cities)")
-  schedule.Load(options.feed_filename)
+  schedule.Load(os.path.expanduser(options.feed_filename))
 
   server = StoppableHTTPServer(
       server_address=("", options.port),

@@ -12,9 +12,10 @@
       "**/*.pkl": true,
       "**/venv/": true,
       "**/venvspark/": true,
+      "**/venvweb/": true,
       "MBTATracker.*": true
     },
-    "python.pythonPath": "venv/bin/python",
+    "python.pythonPath": "/usr/bin/python3",
     "python.linting.pylintArgs": [
       "--disable=no-member",
       "--disable=invalid-name",

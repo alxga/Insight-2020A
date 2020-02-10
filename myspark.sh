@@ -22,18 +22,18 @@ do
     shift
 done
 
-SPARKMYREQS=".reqs4spark.zip"
-MY_REQUIREMENTS="common transitfeed spk_updatevehpospq.py"
+ZIP_NAME=".reqs4spark.zip"
+PY_PACKAGES="common transitfeed spk_updatevehpospq.py"
 
 zip_my_requirements()
 {
-  zip -r - $MY_REQUIREMENTS > "$SPARKMYREQS";
+  zip -r - $PY_PACKAGES > "$ZIP_NAME";
 }
 
 # protoc gtfs-realtime.proto --python_out=.
 zip_my_requirements
 
-args="--py-files=${SPARKMYREQS}"
+args="--py-files=${ZIP_NAME}"
 if [ "$onMaster" = "true" ] ; then
   args="${args} --master spark://${SPARKM}:7077"
 fi
