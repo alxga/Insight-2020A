@@ -45,14 +45,14 @@ File or Package | Role
 **frontend_app.py** | Flask application start-up script
 **myspark.sh** | Helper Bash script to launch Spark jobs
 
-### Subfolder **airdags**
+### Subfolder **airdags/**
 File or Package | Role
 ---- | ----
 **air_download_mbta_gtfs.py** | Airflow DAG to download MBTA schedule if it's updated
 **air_download_mbta_gtfsrt.py** | Airflow DAG to collect the vehicle position feed
 **air_process_mbta_hourly.py** | Airflow DAG to update the database and Parquet files
 
-### Subfolder **airtasks**
+### Subfolder **airtasks/**
 File or Package | Role
 ---- | ----
 **\_\_init__.py** | Converts this folder to a Python package to simplify imports
@@ -62,6 +62,29 @@ File or Package | Role
 **spk_updatedelays.py** | Calculates delays by combining the schedule and vehicle positions and updates the database
 **spk_updatevehpos.py** | Updates the database table containing all of the vehicle positions
 **spk_writeparquets.py** | Saves Parquet files from Protocol Buffer files in S3
+
+### Subfolder **common/**
+File or Package | Role
+---- | ----
+**\_\_init__.py** | Converts this folder to a Python package to simplify imports
+**appex.py** | Application-defined exceptions
+**gtfs.py** | Helpers to parse GTFS feeds from zip archives
+**gtfsrt.py** | Helpers to parse Protocol Buffers files
+**queries.py** | Query strings
+**queryutils.py** | Helpers to connect to the database and run common queries
+**s3.py** | Helpers to work with S3
+**settings.py** | Application configuration
+**utils.py** | Generic helper functions
+
+### Subfolder **frontend/**
+File or Package | Role
+---- | ----
+**api** | Flask blueprints for AJAX calls
+**mbta** | Flask blueprints for HTML pages
+**static** | CSS and Javascript files
+**templates** | Flask templates
+**\_\_init__.py** | Converts this folder to a Python package to simplify imports
+**math.py** | Functions to smoothen data before returning to client
 
 
 ## Author
