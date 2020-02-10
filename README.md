@@ -4,7 +4,7 @@ The application collects General Transit Feed Specification (GTFS) Real-Time (RT
 
 ## Implementation and Source Files and Folders
 
-The tool is implemented as a set of scripts for Python 3 and Bash. Frontend, in addition, contains some HTML, CSS, and Javascript files. The folder structure is described as follows
+The tool is implemented as a set of scripts for Python 3. Frontend, in addition, contains some HTML, CSS, and Javascript files. The folder structure is described as follows
 
 File or Package | Role
 ---- | ----
