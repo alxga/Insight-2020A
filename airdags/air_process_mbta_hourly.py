@@ -1,16 +1,10 @@
-# pylint: disable=unused-import
-
-import os
-import time
-import threading
 from datetime import datetime, timedelta
-import traceback
 
-import requests
 from airflow import DAG
 from airflow.operators.bash_operator import BashOperator
 
 __author__ = "Alex Ganin"
+
 
 BashCmdPrefix = "cd ~/src && "
 

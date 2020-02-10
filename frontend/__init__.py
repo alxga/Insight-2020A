@@ -8,6 +8,8 @@ from flask import Flask, request, current_app, url_for, redirect
 from flask_bootstrap import Bootstrap
 from frontend_config import Config
 
+__author__ = "Alex Ganin"
+
 
 bootstrap = Bootstrap()
 
@@ -26,6 +28,5 @@ def create_app(config_class=Config):
   @app.route('/index', methods=['GET'])
   def index():
     return redirect(url_for('mbta.index'), code=302)
-
 
   return app

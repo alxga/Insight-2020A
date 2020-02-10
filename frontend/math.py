@@ -1,5 +1,8 @@
 import numpy as np
 
+__author__ = "Alex Ganin"
+
+
 def rolling_weighted_triangle_conv(values, weights, window_size):
   """Smoothes the data with a window and given the weights
 

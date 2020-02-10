@@ -4,6 +4,9 @@ from common import Settings
 
 from . import bp
 
+__author__ = "Alex Ganin"
+
+
 @bp.route('/', methods=['GET'])
 @bp.route('/index', methods=['GET'])
 def index():
