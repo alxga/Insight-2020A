@@ -1,7 +1,10 @@
 # MBTA: My Best Transit App
 
 ## Table of Contents
+1. [Problem](README.md#problem)
+1. [Solution](README.md#solution)
 1. [Architecture](README.md#architecture)
+1. [Methods and Assumptions](README.md#methods-and-assumptions)
 1. [Deployment Instructions](README.md#deployment-instructions)
 1. [Directory Structure](README.md#directory-structure)
 1. [License](README.md#license)
@@ -37,15 +40,16 @@ The system in its current implementation on AWS is composed of
 
 ## Methods and Assumptions
 
-The algorithm combines the GTFS schedule and GTFS RT feeds using Spark to calculate delays for this illustrative example as follows.
+The algorithm combines the GTFS schedule for a given service date and GTFS RT feeds from Parquet for that date using Spark to calculate delays for the illustrative example presented in this project.
 
 * GTFS schedule contains 3 files (see more [here](https://developers.google.com/transit/gtfs)):
   * stops.txt - contains a list of stops with their ids, names and locations
   * trips.txt - contains a list of all trips with all the stops and their sequence number
   * stop_times.txt - contains a list of scheduled times for each stop id and trip id
-* GTFS RT feeds provide position of a few hundreds of MBTA vehicles in real-time and a trip id
+* Each GTFS RT feed provides a position, a timestamp, and a trip id for 500-1,000 hundreds of MBTA vehicles
 
-* First the GTFS files are read into a dataframe and joined in Flask based on trip ids and stop ids
+### Algorithm
+* First the 3 GTFS files are read into a dataframe and joined in Spark based on trip ids and stop ids
 * All RT feeds for a given date are read from Parquet into a different dataframe
 * Since I observe a trip on a given day in the RT feed, it is assumed that the trip is serviced on that day and I don't use the information from calendar files in GTFS
 * Vehicle positions are grouped on trip id to form a list of all positions observed for the trip
@@ -53,10 +57,12 @@ The algorithm combines the GTFS schedule and GTFS RT feeds using Spark to calcul
 * The two dataframes above are joined on trip ids and a function is run for each joined entry
 * The function works as follows:
   * It takes two lists as input: one list defines scheduled stop times and stops and the other contains vehicle positions
-  * For each stop and finds the position where the vehicle was observed closest to the stop
-  * To avoid potential edge cases, the scheduled times are shifted 1 day to the future or the past if they differ from the scheduled time by more than 24 hours
+  * For each stop, it finds the position where the vehicle was observed closest to the stop
+  * To avoid potential edge cases, the scheduled times are shifted 1 day to the future or the past if they differ from the observed time by more than 24 hours
   * It computes the difference between the observed time and the scheduled time
-  * It returns a list of rows for each stop on the trip with the calculated values for the vehicle position, the time when it was observed, the distance between the position and the stop, and the estimated delay
+  * It returns a list of rows for each stop on the trip with the calculated values for the vehicle position, the time when it was observed at that position, the distance between the position and the stop, and the estimated delay
+
+**Aggregation of the data for each hour additionally filters out rows where the vehicle was observed farther than 100 meters from the stop location**
 
 ## Deployment Instructions
 
