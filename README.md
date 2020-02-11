@@ -35,6 +35,29 @@ The system in its current implementation on AWS is composed of
 * a Spark cluster (6 m4.large instances) responsible to running the data processing tasks described above
 * a Flask-powered web server (1 t3.medium instance) responsible for presenting the data for exploration
 
+## Methods and Assumptions
+
+The algorithm combines the GTFS schedule and GTFS RT feeds using Spark to calculate delays for this illustrative example as follows.
+
+* GTFS schedule contains 3 files (see more [here](https://developers.google.com/transit/gtfs)):
+  * stops.txt - contains a list of stops with their ids, names and locations
+  * trips.txt - contains a list of all trips with all the stops and their sequence number
+  * stop_times.txt - contains a list of scheduled times for each stop id and trip id
+* GTFS RT feeds provide position of a few hundreds of MBTA vehicles in real-time and a trip id
+
+* First the GTFS files are read into a dataframe and joined in Flask based on trip ids and stop ids
+* All RT feeds for a given date are read from Parquet into a different dataframe
+* Since I observe a trip on a given day in the RT feed, it is assumed that the trip is serviced on that day and I don't use the information from calendar files in GTFS
+* Vehicle positions are grouped on trip id to form a list of all positions observed for the trip
+* Stop times are grouped on trip id to form a list of all scheduled stop times for the trip
+* The two dataframes above are joined on trip ids and a function is run for each joined entry
+* The function works as follows:
+  * It takes two lists as input: one list defines scheduled stop times and stops and the other contains vehicle positions
+  * For each stop and finds the position where the vehicle was observed closest to the stop
+  * To avoid potential edge cases, the scheduled times are shifted 1 day to the future or the past if they differ from the scheduled time by more than 24 hours
+  * It computes the difference between the observed time and the scheduled time
+  * It returns a list of rows for each stop on the trip with the calculated values for the vehicle position, the time when it was observed, the distance between the position and the stop, and the estimated delay
+
 ## Deployment Instructions
 
 * Create a MySQL or Amazon Aurora (in MySQL mode) database either in Amazon Web Services RDS or on an EC2 instance. The database should be accessible from the EC2 machines to be created as described below.
