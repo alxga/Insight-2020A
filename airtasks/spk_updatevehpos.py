@@ -5,66 +5,31 @@ import os
 
 from pyspark.sql import SparkSession
 
-from common import credentials, s3, gtfsrt
-from common.queries import Queries
-from common.queryutils import DBConn, DBConnCommonQueries
+from common import credentials, dbtables
+from common.queryutils import DBConn
 
 __author__ = "Alex Ganin"
 
 
-def fetch_keys_to_update():
-  """Retrieves S3 keys for Protobufs not yet in the VehPos table
-  """
-
-  sqlStmt = """
-    SELECT S3Key FROM `VehPosPb`
-    WHERE NumRecs > 0 and not IsInVehPos;
-  """
-
-  ret = []
-  with DBConn() as con:
-    cur = con.execute(sqlStmt)
-    for tpl in cur:
-      ret.append(tpl[0])
-  return ret
-
-
-def fetch_tpls(objKey):
-  """Retrieves vehicle position tuples for a Protobuf file
-
-  Args:
-    objKey: Protobuf S3 key
-  """
-
-  ret = []
-  s3Mgr = s3.S3Mgr()
-  data = s3Mgr.fetch_object_body(objKey)
-  gtfsrt.process_entities(data,
-      eachVehiclePos=lambda x: ret.append(gtfsrt.vehpos_pb2_to_dbtpl_dtutc(x))
-  )
-  return ret
-
-
 def push_vehpos_db(keyTpls):
-  """Adds records to the VehPos table
+  """Adds multiple records to the VehPos table
 
   Args:
     keyTpls: a tuple of the form (key, tpls) where key is unused and tpls
   are inserted into the table
   """
 
-  sqlStmt = Queries["insertVehPos"]
-  with DBConn() as con:
+  with DBConn() as conn:
     tpls = []
     for keyTpl in keyTpls:
       tpls.append(keyTpl[1])
       if len(tpls) >= 100:
-        con.executemany(sqlStmt, tpls)
-        con.commit()
+        dbtables.VehPos.insertTpls(conn, tpls)
+        conn.commit()
         tpls = []
     if len(tpls) > 0:
-      con.executemany(sqlStmt, tpls)
-      con.commit()
+      dbtables.VehPos.insertTpls(conn, tpls)
+      conn.commit()
 
 
 def set_vehpospb_invehpos(objKeys):
@@ -74,16 +39,12 @@ def set_vehpospb_invehpos(objKeys):
     objKeys: keys for the Protobuf S3 objects
   """
 
-  sqlStmtMsk = """
-    UPDATE `VehPosPb` SET `IsInVehPos` = True
-    WHERE S3Key = '%s';
-  """
-  with DBConnCommonQueries() as con:
+  with DBConn() as conn:
     for objKey in objKeys:
-      con.execute(sqlStmtMsk % objKey)
-      if con.uncommited >= 100:
-        con.commit()
-    con.commit()
+      dbtables.VehPosPb.updateInVehPos(conn, objKey)
+      if conn.uncommited >= 100:
+        conn.commit()
+    conn.commit()
 
 
 def run(spark):
@@ -93,7 +54,12 @@ def run(spark):
     spark: Spark Session object
   """
 
-  keys = fetch_keys_to_update()
+  with DBConn() as conn:
+    dbtables.create_if_not_exists(conn, dbtables.VehPos)
+    conn.commit()
+
+  with DBConn() as conn:
+    keys = dbtables.VehPosPb.selectProtobufKeysNotInVehPos(conn)
   print("Got %d keys" % len(keys), flush=True)
 
   step = 1000
@@ -103,7 +69,7 @@ def run(spark):
     keysSubrange = keys[lower:upper]
     records = spark.sparkContext \
       .parallelize(keysSubrange) \
-      .flatMap(fetch_tpls) \
+      .flatMap(dbtables.VehPos.buildDBTuplesFromProtobuf) \
       .map(lambda tpl: ((tpl[1], tpl[3]), tpl)) \
       .reduceByKey(lambda x, y: x)
 

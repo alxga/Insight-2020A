@@ -8,14 +8,13 @@ from datetime import datetime, timedelta
 from pyspark.sql import SparkSession
 
 from common import credentials
-from common import s3, gtfsrt
-from common.queries import Queries
+from common import s3, dbtables
 from common.queryutils import DBConn, DBConnCommonQueries
 
 __author__ = "Alex Ganin"
 
 
-def fetch_s3prefixes():
+def explore_s3prefixes():
   """Computes a list of S3 prefixes under which to check for new
   Protobuf files
 
@@ -26,7 +25,6 @@ def fetch_s3prefixes():
   """
 
   ret = []
-  # strip time
   pfxDT = datetime(2020, 1, 1)
   utcNow = datetime.utcnow()
   pfxs = []
@@ -34,30 +32,14 @@ def fetch_s3prefixes():
     pfxs.append(pfxDT.strftime("%Y%m%d/%H"))
     pfxDT += timedelta(hours=1)
 
-  existing = {}
-  sqlStmt = Queries["selectS3Prefixes"]
-  with DBConn() as con:
-    cur = con.execute(sqlStmt)
-    for row in cur:
-      existing[row[0]] = 1
+  with DBConn() as conn:
+    exPrefixes = dbtables.S3Prefixes.selectPrefixesDict(conn)
 
   for pfx in pfxs:
-    if pfx not in existing:
+    if pfx not in exPrefixes:
       ret.append(pfx)
 
   return ret
-
-
-def create_vehpospb_tpl(objKey):
-  """Creates a record to add to the VehPosPb table for a Protobuf file
-
-  Args:
-    objKey: S3 key of the Protobuf file
-  """
-
-  s3Mgr = s3.S3Mgr()
-  data = s3Mgr.fetch_object_body(objKey)
-  return gtfsrt.vehpospb_pb2_to_dbtpl(objKey, data)
 
 
 def push_vehpospb_dbtpls(tpls):
@@ -67,26 +49,12 @@ def push_vehpospb_dbtpls(tpls):
     tpls: records to add, each contains metadata for a single Protobuf file
   """
 
-  sqlStmt = Queries["insertVehPosPb"]
-  with DBConn() as con:
+  with DBConn() as conn:
     for tpl in tpls:
-      con.execute(sqlStmt, tpl)
-      if con.uncommited % 1000 == 0:
-        con.commit()
-    con.commit()
-
-def push_s3prefix(name, numKeys):
-  """Pushes a record to the S3Prefixes table
-
-  Args:
-    name: an S3 prefix, e.g., '20200115/10'
-    numKeys: number of Protobuf files under this prefix
-  """
-
-  sqlStmt = Queries["insertS3Prefix"]
-  with DBConn() as con:
-    con.execute(sqlStmt, (name, numKeys))
-    con.commit()
+      dbtables.VehPosPb.insertTpl(conn, tpl)
+      if conn.uncommited % 1000 == 0:
+        conn.commit()
+    conn.commit()
 
 
 def run(spark):
@@ -96,10 +64,11 @@ def run(spark):
     spark: Spark Session object
   """
 
-  with DBConnCommonQueries() as con:
-    con.create_table("S3Prefixes", False)
+  with DBConnCommonQueries() as conn:
+    dbtables.create_if_not_exists(conn, dbtables.S3Prefixes)
+    dbtables.create_if_not_exists(conn, dbtables.VehPosPb)
 
-  pfxs = fetch_s3prefixes()
+  pfxs = explore_s3prefixes()
   s3Mgr = s3.S3Mgr()
   for pfx in pfxs:
     fullPfx = '/'.join(("pb", "VehiclePos", pfx))
@@ -108,11 +77,14 @@ def run(spark):
       print("PROCESSING %d KEYS FOR %s" % (len(keys), pfx))
       file_list = spark.sparkContext.parallelize(keys)
       file_list \
-        .map(create_vehpospb_tpl) \
+        .map(dbtables.VehPosPb.buildTupleFromProtobuf) \
         .foreachPartition(push_vehpospb_dbtpls)
       print("PROCESSED %d KEYS FOR %s" % (len(keys), pfx))
     tpl = (pfx, len(keys))
-    push_s3prefix(*tpl)
+
+    with DBConn() as conn:
+      dbtables.S3Prefixes.insertValues(conn, pfx, len(keys))
+      conn.commit()
     print("PUSHED S3Prefix %s" % str(tpl))
 
 
