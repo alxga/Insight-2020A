@@ -2,6 +2,12 @@
 
 The application collects General Transit Feed Specification (GTFS) Real-Time (RT) vehicle positions feeds (every 5 seconds) and GTFS schedule tables (once a day and only if there is an update) (both are published by the Massachusetts Bay Transportation Authority). The collected data are processed to provide hourly statistics on service delays (in seconds) through a user-friendly web-interface. The web-interface allows analysts accessing the data aggregated by routes, stops, or a combination thereof.
 
+## Table of Contents
+1. [Deployment Instructions](README.md#deployment-instructions)
+1. [Packages and Files](README.md#packages-and-files)
+1. [License](README.md#license)
+1. [Contact Information](README.md#contact-information)
+
 ## Deployment Instructions
 
 * Create a MySQL or Amazon Aurora (in MySQL mode) database either in Amazon Web Services RDS or on an EC2 instance. The database should be accessible from the EC2 machines to be created as described below.
@@ -103,11 +109,10 @@ Only **transitfeed/shapelib.py** and **gtfs-realtime.proto** are currently neede
 
 **gtfs-realtime.proto** comes from [GTFS Realtime Protobuf reference](https://developers.google.com/transit/gtfs-realtime/gtfs-realtime.proto)
 
-
-## Author
-
-* **Alex Ganin** - *Initial work* - [alxga](https://github.com/alxga)
-
 ## License
 
 This project is licensed under the MIT License
+
+## Contact Information
+
+* **Alex Ganin** - *Initial work* - [alxga](https://github.com/alxga)
