@@ -1,3 +1,5 @@
+"""Airflow DAG to update the database and Parquet files"""
+
 from datetime import datetime, timedelta
 
 from airflow import DAG

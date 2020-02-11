@@ -1,3 +1,5 @@
+"""Airflow DAG to download MBTA schedule if it's updated"""
+
 from datetime import datetime, timedelta
 
 from airflow import DAG

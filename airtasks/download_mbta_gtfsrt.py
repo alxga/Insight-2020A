@@ -15,6 +15,12 @@ __author__ = "Alex Ganin"
 
 
 def push_vehpospb_dbtpl(tpl):
+  """Inserts a record into the VehPosPb table
+
+  Args:
+    tpl: a tuple to save into the database
+  """
+
   cnx = None
   cursor = None
   sqlStmt = Queries["insertVehPosPb"]
@@ -32,6 +38,15 @@ def push_vehpospb_dbtpl(tpl):
 
 
 def download_feed(dirName, url, *args):
+  """Downloads a real-time vehicle positions file to the local storage
+  and then uploads it to S3 and removes from the local storage
+
+  Args:
+    dirName: the local directory where the file will be saved initially
+    url: the URL to download the file from
+    *args: placeholder for any additional arguments, unused
+  """
+
   fName = datetime.now().strftime("%Y%m%d-%H%M%S.pb")
   r = requests.get(url)
   fPath = os.path.join(Settings.ProjPath, "pb", dirName, fName)
@@ -61,6 +76,9 @@ def download_feed(dirName, url, *args):
 
 
 def main():
+  """Downloads the vehicle positions feed from MBTA
+  12 times during 1 minute by running a new thread every 5 seconds
+  """
   Feeds = [
       ("VehiclePos", "https://cdn.mbta.com/realtime/VehiclePositions.pb", 5)
   ]

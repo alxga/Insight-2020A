@@ -1,3 +1,7 @@
+"""Module to combine GTFS schedule feeds with vehicle positions Parquet files
+and update the VPDelays and HlyDelays tables
+"""
+
 # pylint: disable=cell-var-from-loop
 
 import os
@@ -20,6 +24,9 @@ __author__ = "Alex Ganin"
 
 
 class VPDelaysCalculator:
+  """Class to handle calculations and updates to the VPDelays table
+  """
+
   TableSchema = StructType([
     StructField("RouteId", StringType(), True),
     StructField("TripId", StringType(), False),
@@ -39,6 +46,14 @@ class VPDelaysCalculator:
 
 
   def __init__(self, spark, pqDate, dfStopTimes, dfVehPos):
+  """Initializes the instance
+  
+  Args:
+    spark: Spark Session object
+    pqDate: a date of the Parquet file with vehicle positions
+    dfStopTimes: dataframe of stop times from the schedule
+    dfVehPos: dataframe of vehicle positions
+  """
     self.spark = spark
     self.pqDate = pqDate
     self.dfStopTimes = dfStopTimes
@@ -46,6 +61,9 @@ class VPDelaysCalculator:
 
 
   def createResultDF(self):
+  """Creates the delays dataframe from the schedule and vehicle positions
+  dataframes
+  """
     rddStopTimes = self.dfStopTimes.rdd \
       .map(lambda rec: (rec.trip_id, tuple(rec))) \
       .groupByKey()
@@ -63,6 +81,8 @@ class VPDelaysCalculator:
 
 
   def updateDB(self, dfVPDelays):
+  """Saves a delays dataframe to the database table VPDelays
+  """
     pqDate = self.pqDate
     dfVPDelays.foreachPartition(lambda rows:
         VPDelaysCalculator._push_vpdelays_dbtpls(rows, pqDate)
@@ -146,6 +166,10 @@ class VPDelaysCalculator:
 
 
 class HlyDelaysCalculator:
+  """Class to handle calculations and updates to the HlyDelays table
+
+  Aggregates data on delays by date and hour in the US/Eastern timezone
+  """
   TableSchema = StructType([
     StructField("DateEST", DateType(), False),
     StructField("HourEST", IntegerType(), False),
@@ -166,15 +190,30 @@ class HlyDelaysCalculator:
 
   @staticmethod
   def datetime_to_datehour(dt):
+  """Converts a UTC datetime to a date and hour in the US/Eastern time zone
+
+  Args:
+    dt: datetime to convert
+  """
     dt = dt.replace(tzinfo=pytz.UTC) \
         .astimezone(pytz.timezone("US/Eastern"))
     return (dt.date(), dt.hour)
 
+
   def __init__(self, spark, dfVPDelays):
+  """Initializes the instance
+  
+  Args:
+    spark: Spark Session object
+    dfVPDelays: dataframe containing unaggregated delays for trips and stops
+  """
     self.spark = spark
     self.dfVPDelays = dfVPDelays
 
   def createResultDF(self):
+  """Aggregates a delays dataframe so that it has data groupped by
+  Date (US/Eastern time), Hour (US/Eastern time), RouteId, and StopName
+  """
     udf_datetime_to_datehour = F.udf(
       HlyDelaysCalculator.datetime_to_datehour,
       HlyDelaysCalculator.DateHour
@@ -206,6 +245,9 @@ class HlyDelaysCalculator:
     return dfResult
 
   def groupRoutes(self, dfHlyDelays):
+  """Additionally aggregates an hourly delays dataframe so that it has data
+  groupped by Date (US/Eastern time), Hour (US/Eastern time), and RouteId
+  """
     dfResult = dfHlyDelays \
       .groupBy(
           dfHlyDelays.DateEST, dfHlyDelays.HourEST, dfHlyDelays.RouteId
@@ -219,6 +261,9 @@ class HlyDelaysCalculator:
     return dfResult
 
   def groupStops(self, dfHlyDelays):
+  """Additionally aggregates an hourly delays dataframe so that it has data
+  groupped by Date (US/Eastern time), Hour (US/Eastern time), and StopName
+  """
     dfResult = dfHlyDelays \
       .groupBy(
           dfHlyDelays.DateEST, dfHlyDelays.HourEST, dfHlyDelays.StopName
@@ -236,6 +281,9 @@ class HlyDelaysCalculator:
     return dfResult
 
   def groupAll(self, dfHlyDelays):
+  """Additionally aggregates an hourly delays dataframe so that it has data
+  groupped by Date (US/Eastern time) and Hour (US/Eastern time) only
+  """
     dfResult = dfHlyDelays \
       .groupBy(
           dfHlyDelays.DateEST, dfHlyDelays.HourEST
@@ -251,6 +299,8 @@ class HlyDelaysCalculator:
 
 
   def updateDB(self, dfHlyDelays, pqDate, noRouteVal=None):
+  """Saves a delays dataframe to the database table HlyDelays
+  """
     dfHlyDelays.foreachPartition(lambda rows:
         HlyDelaysCalculator._push_hlydelays_dbtpls(rows, pqDate, noRouteVal)
     )
@@ -277,8 +327,17 @@ class HlyDelaysCalculator:
 
 
 class GTFSFetcher:
+  """Class to create stop times dataframe from GTFS schedule on S3
+  """
+
   def __init__(self, spark):
+  """Initializes the instance
+  
+  Args:
+    spark: Spark Session object
+  """
     self.spark = spark
+
 
   def _fetch_stops_df(self, prefix):
     _objKey = '/'.join([prefix, "stops.txt"])
@@ -323,6 +382,11 @@ class GTFSFetcher:
 
 
   def readStopTimes(self, feedDesc):
+  """Reads a GTFS feed and returns a stop times dataframe
+
+  Args:
+    feedDesc: an MBTA_ArchivedFeedDesc object
+  """  
     prefix = '/'.join(["GTFS", feedDesc.s3Key])
 
     # rename some columns to disambiguate after joining the tables
@@ -345,6 +409,8 @@ class GTFSFetcher:
 
   @staticmethod
   def readFeedDescs():
+  """Retrieves a list of GTFS feed descriptions available on S3
+  """  
     objKey = '/'.join(["GTFS", "MBTA_archived_feeds.txt"])
     s3Mgr = s3.S3Mgr()
     content = s3Mgr.fetch_object_body(objKey)
@@ -354,6 +420,8 @@ class GTFSFetcher:
 PqDate = namedtuple("PqDate", "Date IsInVPDelays IsInHlyDelays")
 
 def fetch_pqdates_to_update():
+  """Retrieves a list of Parquet files for which delays need to be calculated
+  """  
   ret = []
   sqlStmt = Queries["selectPqDatesWhere"] %\
     "NumRecs > 0 and (not IsInVPDelays or not IsInHlyDelays)"
@@ -365,6 +433,12 @@ def fetch_pqdates_to_update():
 
 
 def delete_pqdate_from_table(D, tableName):
+  """Removes delays for a particular Parquet file from a delays table
+
+  Args:
+    D: Parquet file prefix
+    tableName: name of the table, e.g., VPDelays or HlyDelays
+  """  
   sqlStmt = """
     DELETE FROM `%s` WHERE D = '%s';
   """ % (tableName, D.strftime("%Y-%m-%d"))
@@ -372,7 +446,14 @@ def delete_pqdate_from_table(D, tableName):
     con.execute(sqlStmt)
     con.commit()
 
+
 def set_pqdate_flag(D, flag):
+  """Sets a column in a PqDates table to a value
+
+  Args:
+    D: Parquet file prefix for which the column should be set
+    flag: column name, e.g., IsInVPDelays or IsInHlyDelays
+  """  
   sqlStmt = """
     UPDATE `PqDates` SET `%s` = True
     WHERE D = '%s';
@@ -383,12 +464,25 @@ def set_pqdate_flag(D, flag):
 
 
 def read_vp_parquet(spark, targetDate):
+  """Creates a dataframe for a Parquet file
+
+  Args:
+    spark: Spark Session object
+    targetDate: date for which to read the Parquet
+  """  
   objUri = "VP-" + targetDate.strftime("%Y%m%d")
   objUri = "s3a://" + '/'.join((Settings.S3BucketName, "parquet", objUri))
   return spark.read.parquet(objUri)
 
 
 def run(spark):
+  """Combines GTFS schedule feed with vehicle positions Parquet files
+  and updates the VPDelays and HlyDelays tables
+
+  Args:
+    spark: Spark Session object
+  """
+
   with DBConnCommonQueries() as con:
     con.create_table("VPDelays", False)
     con.create_table("HlyDelays", False)

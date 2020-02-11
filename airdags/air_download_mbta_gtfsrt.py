@@ -1,3 +1,5 @@
+"""Airflow DAG to collect the vehicle position feed"""
+
 from datetime import datetime, timedelta
 
 from airflow import DAG

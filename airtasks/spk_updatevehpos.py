@@ -1,12 +1,8 @@
-# pylint: disable=unused-import
-
 import os
 
-import mysql.connector
 from pyspark.sql import SparkSession
 
-from common import credentials
-from common import s3, gtfsrt
+from common import credentials, s3, gtfsrt
 from common.queries import Queries
 from common.queryutils import DBConn, DBConnCommonQueries
 

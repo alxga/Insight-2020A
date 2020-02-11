@@ -1,3 +1,7 @@
+"""Module to update the metadata about S3 files in S3Prefixes and VehPosPb
+tables
+"""
+
 import os
 from datetime import datetime, timedelta
 
@@ -12,6 +16,15 @@ __author__ = "Alex Ganin"
 
 
 def fetch_s3prefixes():
+  """Computes a list of S3 prefixes under which to check for new
+  Protobuf files
+
+  A prefix is a combination of date and an hour when the Protobufs
+  were downloaded. Each hour starting on 2020/01/01 00:00 and
+  ending 70 minutes before the current time is returned unless it's marked
+  in the S3Prefixes table as processed.
+  """
+
   ret = []
   # strip time
   pfxDT = datetime(2020, 1, 1)
@@ -35,13 +48,23 @@ def fetch_s3prefixes():
   return ret
 
 
-def fetch_vehpospb_tpl(objKey):
+def create_vehpospb_tpl(objKey):
+  """Creates a record to add to the VehPosPb table for a Protobuf file
+
+  Args:
+    objKey: S3 key of the Protobuf file
+  """
   s3Mgr = s3.S3Mgr()
   data = s3Mgr.fetch_object_body(objKey)
   return gtfsrt.vehpospb_pb2_to_dbtpl(objKey, data)
 
 
 def push_vehpospb_dbtpls(tpls):
+  """Pushes records to the VehPosPb table
+
+  Args:
+    tpls: records to add, each contains metadata for a single Protobuf file
+  """
   sqlStmt = Queries["insertVehPosPb"]
   with DBConn() as con:
     for tpl in tpls:
@@ -51,6 +74,12 @@ def push_vehpospb_dbtpls(tpls):
     con.commit()
 
 def push_s3prefix(name, numKeys):
+  """Pushes a record to the S3Prefixes table
+
+  Args:
+    name: an S3 prefix, e.g., '20200115/10'
+    numKeys: number of Protobuf files under this prefix
+  """
   sqlStmt = Queries["insertS3Prefix"]
   with DBConn() as con:
     con.execute(sqlStmt, (name, numKeys))
@@ -58,6 +87,11 @@ def push_s3prefix(name, numKeys):
 
 
 def run(spark):
+  """Indexes Protobuf files by updating the S3Prefixes and VehPosPb tables
+
+  Args:
+    spark: Spark Session object
+  """
   with DBConnCommonQueries() as con:
     con.create_table("S3Prefixes", False)
 
@@ -70,7 +104,7 @@ def run(spark):
       print("PROCESSING %d KEYS FOR %s" % (len(keys), pfx))
       file_list = spark.sparkContext.parallelize(keys)
       file_list \
-        .map(fetch_vehpospb_tpl) \
+        .map(create_vehpospb_tpl) \
         .foreachPartition(push_vehpospb_dbtpls)
       print("PROCESSED %d KEYS FOR %s" % (len(keys), pfx))
     tpl = (pfx, len(keys))
