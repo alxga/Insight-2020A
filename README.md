@@ -16,13 +16,13 @@ Urban transportation systems are vulnerable to congestion, accidents, weather, s
 
 ## Solution
 
-Most of the public transportation agencies provide real-time information on positions of their vehicles, trip updates, and alerts adhering to the [General Transit Feed Specification (GTFS) Real-Time (RT)](https://developers.google.com/transit/gtfs-realtime). This project takes a stab at building a scalable architecture to collect vehicle position (VP) feeds from public transportation agencies in different cities around the world by focusing on MBTA - Massachusetts Bay Transportation Authority. For illustration, I am using the VP data to provide information on service delays for every combination of stop and route on an hourly basis through a web user-interface. The UI also allows aggregation for all stops, for all routes, for bus routes only, for train routes only as well as skipping weekends or weekdays. Notably, the analyses on the positions data collected can be extended to include measurements of vehicle speeds on route segments or stop durations among others.
+Most of the public transportation agencies provide real-time information on positions of their vehicles, trip updates, and alerts adhering to the [General Transit Feed Specification (GTFS) Real-Time (RT)](https://developers.google.com/transit/gtfs-realtime). This project takes a stab at building a scalable architecture to collect vehicle position (VP) feeds from public transportation agencies in different cities around the world by focusing on MBTA - Massachusetts Bay Transportation Authority. For illustration, I am using the VP data to provide information on service delays for every combination of stop and route on an hourly basis through a [web user-interface](http://figuresfacts.me/mbta/index). The UI also allows aggregation for all stops, for all routes, for bus routes only, for train routes only as well as skipping weekends or weekdays. Notably, the analyses on the positions data collected can be extended to include measurements of vehicle speeds on route segments or stop durations among others.
 
 ## Architecture
 
 The application collects GTFS RT vehicle positions feeds (every 5 seconds) and GTFS schedule tables (once a day and only if there is an update) (both are published by the Massachusetts Bay Transportation Authority). The architecture of the system is described below.
 
-![Architecture](frontend/static/img/architecture.png)
+![Architecture](frontend/static/img/architecture.jpg)
 
 The system in its current implementation on AWS is composed of
 * an Airflow server and 2 workers (3 t3.medium instances)
@@ -32,10 +32,10 @@ The system in its current implementation on AWS is composed of
     * Every day: a script collects GTFS data if a new schedule has been published
   * 2nd worker is responsible for data analysis on a Spark cluster. It runs an Airflow task graph once an hour. The graph defines a sequence of tasks where each task depends on the previous task. All of the tasks save their progress information into 3 database tables so that the work is not done more than once. The tasks accomplish the following
     1. Index downloaded real-time vehicle position feeds (Protobufs) in S3 and save the Protobuf metadata into the database
-    1. Read the Protobuf files from S3 and insert records into a table for each vehicle position observed while removing duplicates
+    1. Read the Protobuf files from S3 and insert records into a table for each vehicle position observed, while removing duplicates
     1. Write the vehicle positions into a Parquet file for each date, the day is defined to end at 3am US/Eastern time (when public transportation trips are infrequent) (while the task is run every hour it only does the actual work once a day)
     1. Compute service delays for all trips and all routes and save to a table in the database, aggregate those on an hourly basis and save to a different table in the database (this task is also run every hour but does the actual work only once a day)
-* a Spark cluster (6 m4.large instances) responsible to running the data processing tasks described above
+* a Spark cluster (6 m4.large instances) responsible for running the data processing tasks described above
 * a Flask-powered web server (1 t3.medium instance) responsible for presenting the data for exploration
 
 ## Methods and Assumptions
