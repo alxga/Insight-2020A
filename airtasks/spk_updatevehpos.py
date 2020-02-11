@@ -6,7 +6,7 @@ import os
 from pyspark.sql import SparkSession
 
 from common import credentials, dbtables
-from common.queryutils import DBConn
+from common.queryutils import DBConn, DBConnCommonQueries
 
 __author__ = "Alex Ganin"
 
@@ -54,7 +54,7 @@ def run(spark):
     spark: Spark Session object
   """
 
-  with DBConn() as conn:
+  with DBConnCommonQueries() as conn:
     dbtables.create_if_not_exists(conn, dbtables.VehPos)
     conn.commit()
 

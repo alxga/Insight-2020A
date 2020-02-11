@@ -176,7 +176,7 @@ class VehPos:
     """Retrieves vehicle position tuples from a Protobuf file
 
     Timestamps are converted to naive UTC datetimes. Use this function to
-    upload records to the database
+    upload records to the database.
 
     Args:
       objKey: Protobuf S3 key
@@ -207,7 +207,7 @@ class VehPos:
     """Retrieves vehicle position tuples from a Protobuf file
 
     Timestamps are converted to naive local datetimes. Use this function to
-    write records to a Parquet file
+    write records to a Parquet file.
 
     Args:
       objKey: Protobuf S3 key
