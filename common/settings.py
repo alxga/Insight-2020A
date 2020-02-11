@@ -21,7 +21,7 @@ class Settings:
   def __init__(self):
     """Initializes the instance"""
 
-    self.AppName = "Arrivals-Watch"
+    self.AppName = "my best transit app"
     self.FooterLine = "Alex Ganin, Insight Data Engineering, Boston MA, Winter 2020"
 
     self.PyPath = os.path.abspath(os.path.dirname(__file__))

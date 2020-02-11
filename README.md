@@ -1,4 +1,4 @@
-# Arrivals-Watch by Alex Ganin
+# my best transit app by Alex Ganin
 
 ## Table of Contents
 1. [Problem](README.md#problem)
