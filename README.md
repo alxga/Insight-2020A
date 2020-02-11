@@ -22,7 +22,7 @@ Most of the public transportation agencies provide real-time information on posi
 
 The application collects GTFS RT vehicle positions feeds (every 5 seconds) and GTFS schedule tables (once a day and only if there is an update) (both are published by the Massachusetts Bay Transportation Authority). The architecture of the system is described below.
 
-![Architecture](frontend/static/img/architecture.png)
+![Architecture](frontend/static/img/architecture.jpg)
 
 The system in its current implementation on AWS is composed of
 * an Airflow server and 2 workers (3 t3.medium instances)
