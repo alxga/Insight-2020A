@@ -30,6 +30,7 @@ The application collects General Transit Feed Specification (GTFS) Real-Time (RT
 
 The tool is implemented as a set of scripts for Python 3. Frontend, in addition, contains some HTML, CSS, and Javascript files. The folder structure is as follows
 
+### Root Directory
 File or Package | Role
 ---- | ----
 **.vscode/** | Visual Studio Code project configuration files
@@ -43,6 +44,65 @@ File or Package | Role
 **air_dagbag.py** | Allows Airflow to discover task definition graphs in the **airdags/** folder, should be deployed to $AIRFLOW_HOME/dags and modified as described in the file to point to the **airdags/** folder
 **frontend_app.py** | Flask application start-up script
 **myspark.sh** | Helper Bash script to launch Spark jobs
+
+### Subfolder **airdags/**
+File or Package | Role
+---- | ----
+**air_download_mbta_gtfs.py** | Airflow DAG to download MBTA schedule if it's updated
+**air_download_mbta_gtfsrt.py** | Airflow DAG to collect the vehicle position feed
+**air_process_mbta_hourly.py** | Airflow DAG to update the database and Parquet files
+
+### Subfolder **airtasks/**
+File or Package | Role
+---- | ----
+**\_\_init__.py** | Converts this folder to a Python package to simplify imports
+**download_mbta_gtfs.py** | Downloads MBTA schedule if it's updated
+**download_mbta_gtfsrt.py** | Downloads MBTA real-time vehicle positions
+**spk_indexprotobufs.py** | Indexes Protocol Buffer files in S3 and saves the information into the database
+**spk_updatedelays.py** | Calculates delays by combining the schedule and vehicle positions and updates the database
+**spk_updatevehpos.py** | Updates the database table containing all of the vehicle positions
+**spk_writeparquets.py** | Saves Parquet files from Protocol Buffer files in S3
+
+### Subfolder **common/**
+File or Package | Role
+---- | ----
+**\_\_init__.py** | Converts this folder to a Python package to simplify imports
+**appex.py** | Application-defined exceptions
+**gtfs.py** | Helpers to parse GTFS feeds from zip archives
+**gtfsrt.py** | Helpers to parse Protocol Buffers files
+**queries.py** | Query strings
+**queryutils.py** | Helpers to connect to the database and run common queries
+**s3.py** | Helpers to work with S3
+**settings.py** | Application configuration
+**utils.py** | Generic helper functions
+
+### Subfolder **frontend/**
+
+File or Package | Role
+---- | ----
+**api** | Flask blueprints for AJAX calls
+**mbta** | Flask blueprints for HTML pages
+**static** | CSS and Javascript files
+**templates** | Flask templates
+**\_\_init__.py** | Converts this folder to a Python package to simplify imports
+**math.py** | Functions to smoothen data before returning to client
+
+### Subfolder **third_party/**
+
+Package or File | Role
+---- | ----
+**gtfsscheduleviewer/** | Scripts to display a Marey graph in **schedule_viewer.py**
+**transitfeed/** | Library to parse and validate static GTFS feeds
+**\_\_init__.py** | Converts this folder to a Python package to simplify imports
+**gtfs-realtime.proto** | Main launch script
+**schedule_viewer.py** | Stores and computes configuration settings and paths for the tool
+
+Only **transitfeed/shapelib.py** and **gtfs-realtime.proto** are currently needed for the main app
+
+**gtfsscheduleviewer**, **transitfeed**, and **schedule_viewer.py** were downloaded from [a project porting Google's no longer supported **transitfeed** library to Python 3](https://github.com/pecalleja/transitfeed/tree/python3)
+
+**gtfs-realtime.proto** comes from [GTFS Realtime Protobuf reference](https://developers.google.com/transit/gtfs-realtime/gtfs-realtime.proto)
+
 
 ## Author
 
