@@ -32,7 +32,7 @@ The system in its current implementation on AWS is composed of
     * Every day: a script collects GTFS data if a new schedule has been published
   * 2nd worker is responsible for data analysis on a Spark cluster. It runs an Airflow task graph once an hour. The graph defines a sequence of tasks where each task depends on the previous task. All of the tasks save their progress information into 3 database tables so that the work is not done more than once. The tasks accomplish the following
     1. Index downloaded real-time vehicle position feeds (Protobufs) in S3 and save the Protobuf metadata into the database
-    1. Read the Protobuf files from S3 and insert records into a table for each vehicle position observed while removing duplicates
+    1. Read the Protobuf files from S3 and insert records into a table for each vehicle position observed, while removing duplicates
     1. Write the vehicle positions into a Parquet file for each date, the day is defined to end at 3am US/Eastern time (when public transportation trips are infrequent) (while the task is run every hour it only does the actual work once a day)
     1. Compute service delays for all trips and all routes and save to a table in the database, aggregate those on an hourly basis and save to a different table in the database (this task is also run every hour but does the actual work only once a day)
 * a Spark cluster (6 m4.large instances) responsible for running the data processing tasks described above
