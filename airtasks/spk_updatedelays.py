@@ -485,6 +485,7 @@ def run(spark):
         calcVPDelays.updateDB(dfVPDelays)
         with DBConn() as conn:
           dbtables.PqDates.updateInDelays(conn, targetDate, "IsInVPDelays")
+          conn.commit()
 
       calcHlyDelays = HlyDelaysCalculator(spark, dfVPDelays)
       dfHlyDelays = calcHlyDelays.createResultDF().persist()
@@ -512,6 +513,7 @@ def run(spark):
         calcHlyDelays.updateDB(dfGrpAllTrain, targetDate, "ALLTRAINS")
         with DBConn() as conn:
           dbtables.PqDates.updateInDelays(conn, targetDate, "IsInHlyDelays")
+          conn.commit()
 
 
 if __name__ == "__main__":
