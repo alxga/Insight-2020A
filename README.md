@@ -115,4 +115,4 @@ This project is licensed under the MIT License
 
 ## Contact Information
 
-* **Alex Ganin** - *Initial work* - [alxga](https://github.com/alxga)
+**Alex Ganin** - *Initial work* - [alxga](https://github.com/alxga)
