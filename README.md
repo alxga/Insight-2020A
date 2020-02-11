@@ -13,13 +13,27 @@ Urban transportation systems are vulnerable to congestion, accidents, weather, s
 
 ## Solution
 
-Most of the public transportation agencies provide real-time information on the positions of their vehicles, trip updates, and alerts adhering to the [General Transit Feed Specification (GTFS) Real-Time (RT)](https://developers.google.com/transit/gtfs-realtime). This project takes a stab at building a scalable architecture to collect vehicle position (VP) feeds from public transportation agencies in different cities around the world by focusing on MBTA - Massachusetts Bay Transportation Authority. For illustration, I am using the VP data to provide information on service delays for every combination of stop and route on an hourly basis through a web user-interface. The UI also allows aggregation for all stops, for all routes, for bus routes only, for train routes only as well as skipping weekends or weekdays. Notably, the analyses on the positions data collected can be extended to include measurements of vehicle speeds on route segments or stop durations among others.
+Most of the public transportation agencies provide real-time information on positions of their vehicles, trip updates, and alerts adhering to the [General Transit Feed Specification (GTFS) Real-Time (RT)](https://developers.google.com/transit/gtfs-realtime). This project takes a stab at building a scalable architecture to collect vehicle position (VP) feeds from public transportation agencies in different cities around the world by focusing on MBTA - Massachusetts Bay Transportation Authority. For illustration, I am using the VP data to provide information on service delays for every combination of stop and route on an hourly basis through a web user-interface. The UI also allows aggregation for all stops, for all routes, for bus routes only, for train routes only as well as skipping weekends or weekdays. Notably, the analyses on the positions data collected can be extended to include measurements of vehicle speeds on route segments or stop durations among others.
 
 ## Architecture
 
-The application collects General Transit Feed Specification (GTFS) Real-Time (RT) vehicle positions feeds (every 5 seconds) and GTFS schedule tables (once a day and only if there is an update) (both are published by the Massachusetts Bay Transportation Authority). The collected data are processed to provide hourly statistics on service delays (in seconds) through a user-friendly web-interface. The web-interface allows analysts accessing the data aggregated by routes, stops, or a combination thereof. The architecture of the system is described below.
+The application collects GTFS RT vehicle positions feeds (every 5 seconds) and GTFS schedule tables (once a day and only if there is an update) (both are published by the Massachusetts Bay Transportation Authority). The architecture of the system is described below.
 
 ![Architecture](frontend/static/img/architecture.png)
+
+The system in its current implementation on AWS is composed of
+* an Airflow server and 2 workers (3 t3.medium instances)
+  * Airflow server schedules tasks to run on the workers and provides a web-interface for task management
+  * 1st worker is responsible for running data downloads and runs 2 tasks
+    * Every minute: a script collects GTFS RT data every 5 seconds during that minute (a thread is started every 5 seconds)
+    * Every day: a script collects GTFS data if a new schedule has been published
+  * 2nd worker is responsible for data analysis on a Spark cluster. It runs an Airflow task graph once an hour. The graph defines a sequence of tasks where each task depends on the previous task. All of the tasks save their progress into 3 database metainformation tables. The tasks accomplish the following
+    1. Index downloaded real-time feeds in S3 and saving their metadata into the database
+    1. Read the protobuf files (vehicle position feeds) from S3 and insert records into a table for each vehicle position observed while removing duplicates
+    1. Write the vehicle positions into a Parquet file for each date, the day is defined to end at 3am US/Eastern time (when public transportation trips are infrequent)
+    1. Compute service delays for all trips and all routes and save to a table in the database, aggregate those on an hourly basis and save to a different table in the database
+* a Spark cluster (6 m4.large instances) responsible to running the data processing tasks described above
+* a Flask-powered web server (1 t3.medium instance) responsible for presenting the data for exploration
 
 ## Deployment Instructions
 
@@ -34,7 +48,9 @@ The application collects General Transit Feed Specification (GTFS) Real-Time (RT
   * Set the Python for **pyspark** as follows `peg sshcmd-cluster spark_cluster 'sudo echo PYSPARK_PYTHON=/home/ubuntu/venv/bin/python >> /usr/local/spark/conf/spark-env.sh'` and `peg sshcmd-cluster spark_cluster 'sudo echo PYSPARK_DRIVER_PYTHON=/home/ubuntu/venv/bin/python >> /usr/local/spark/conf/spark-env.sh'`
   * Reboot the cluster `peg sshcmd-cluster spark_cluster sudo reboot` and start Spark `peg service spark_cluster spark start`
 
-* Create and configure an Airflow server and 2 workers as described [here](https://corecompete.com/scaling-out-airflow-with-celery-and-rabbitmq-to-orchestrate-etl-jobs-on-the-cloud)
+* Create and configure an Airflow server and 2 workers, see examples [here](https://corecompete.com/scaling-out-airflow-with-celery-and-rabbitmq-to-orchestrate-etl-jobs-on-the-cloud)
+  * Install Google Protocol Buffer libraries on each of the machines `sudo apt install protobuf-compiler`
+  * Install dependencies from the requirements.txt file in this repository
   * Create an additional queue named _sparks_ for Spark tasks
   * The second worker needs to be additionally configured by editing the file $AIRFLOW_HOME/airflow.cfg and setting the value `default_queue = sparks`
   * Place the file _air_dagbag.py_ in the directory $AIRFLOW_HOME/dags on all the Airflow machines
@@ -43,7 +59,11 @@ The application collects General Transit Feed Specification (GTFS) Real-Time (RT
   * Start the Airflow server and workers as described at the link above
   
 * Configure a Flask webserver on an additional Amazon Web Services EC2 instance
+  * Install Google Protocol Buffer libraries on each of the machines `sudo apt install protobuf-compiler`
+  * Install dependencies from the requirements.txt file in this repository
   * Make sure that the following environment variables are set on the webserver machine: MYSQL_HOST, MYSQL_USER, MYSQL_PWD, MYSQL_DBNAME, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION
+  * Configure and start **nginx**
+  * Configure **supervisor** to run Flask and start the web server
 
 ## Directory Structure
 
