@@ -1,3 +1,5 @@
+"""Query strings"""
+
 __author__ = "Alex Ganin"
 
 

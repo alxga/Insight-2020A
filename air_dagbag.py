@@ -1,6 +1,6 @@
-""" Add additional DAGs folders
+"""Adds additional DAGs folders
 
-  The file should be placed into the folder $AIRFLOW_HOME/dags
+The file should be placed into the folder $AIRFLOW_HOME/dags
 """
 
 import os

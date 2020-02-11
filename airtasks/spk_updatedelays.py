@@ -219,7 +219,7 @@ class HlyDelaysCalculator:
 
 
   def createResultDF(self):
-    """Aggregates a delays dataframe so that it has data groupped by
+    """Aggregates a delays dataframe so that it has data grouped by
     Date (US/Eastern time), Hour (US/Eastern time), RouteId, and StopName
     """
 

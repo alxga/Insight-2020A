@@ -1,24 +1,20 @@
+"""Generic helper functions"""
+
 from datetime import datetime, timedelta
-from . import Settings
 
 __author__ = "Alex Ganin"
 
 
-def open_csv_r(filePath):
-  if Settings.PyVersion >= 3:
-    return open(filePath, "rt", newline="")
-  else:
-    return open(filePath, "rb")
-
-
-def open_csv_w(filePath):
-  if Settings.PyVersion >= 3:
-    return open(filePath, "wt", newline="")
-  else:
-    return open(filePath, "wb")
-
-
 def index_in_list(lst, val):
+  """Returns the index of an element in a list
+
+  Runs a linear search
+
+  Args:
+    lst: list where to search the element
+    val: element to search for
+  """
+
   i = 0
   for item in lst:
     if item == val:
@@ -27,17 +23,16 @@ def index_in_list(lst, val):
   return -1
 
 
-def msec(tDelta):
-  return int(tDelta.total_seconds() * 1000 + 0.5)
-
-
-def remove_enclosing_quotes(txt):
-  if len(txt) >= 2 and txt[0] == '\'' and txt[-1] == '\'':
-    return txt[1:-1]
-  else:
-    return txt
-
 def replace_s3_invalid_characters(key):
+  """Replaces characters invalid for an S3 object key in a string
+
+  Args:
+    key: string where to replace characters
+
+  Returns:
+    string where any invalid characters were replaced with underscores
+  """
+
   spec_chars = " !-_'.,*()"
   lst = []
   for char in key:
@@ -49,12 +44,32 @@ def replace_s3_invalid_characters(key):
 
 
 def daterange(start_date, end_date):
+  """Returns an object for a range of datetimes to use in loops
+
+  Datetimes increase in increments of 1 day
+
+  Args:
+    start_date: datetime where the range starts
+    end_date: datetime where the range ends
+  """
+
   deltadays = int((end_date - start_date).days)
   for n in range(deltadays):
     yield start_date + timedelta(n)
 
 
 def sched_time_to_dt(timeStr, targetDate):
+  """Converts a GTFS schedule time string to a datetime
+
+  Note that a GTFS time may be more than 24 hours, in which case
+  the function removes 24 from the hours part of the time and increases
+  the date part of the datetime by 1
+
+  Args:
+    timeStr: time part of the datetime object
+    targetDate: date part of the datetime object
+  """
+
   if targetDate is None:
     targetDate = datetime.today()
   tkns = timeStr.split(':')

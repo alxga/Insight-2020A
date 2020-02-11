@@ -1,3 +1,6 @@
+"""Frontend Flask app definition script
+"""
+
 # pylint: disable=invalid-name
 
 from frontend import create_app

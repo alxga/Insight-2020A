@@ -1,3 +1,5 @@
+"""Objects to hold access credentials for S3 and database"""
+
 import os
 
 EnvVars = [
