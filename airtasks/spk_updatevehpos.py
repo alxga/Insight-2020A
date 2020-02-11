@@ -56,7 +56,6 @@ def run(spark):
 
   with DBConnCommonQueries() as conn:
     dbtables.create_if_not_exists(conn, dbtables.VehPos)
-    conn.commit()
 
   with DBConn() as conn:
     keys = dbtables.VehPosPb.selectProtobufKeysNotInVehPos(conn)

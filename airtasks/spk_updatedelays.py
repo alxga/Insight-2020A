@@ -16,8 +16,7 @@ from pyspark.sql.types import StringType, DoubleType, IntegerType, \
   DateType, TimestampType
 from third_party.transitfeed import shapelib
 from common import credentials
-from common import Settings, s3, utils, gtfs
-from common.queries import Queries
+from common import Settings, s3, utils, gtfs, dbtables
 from common.queryutils import DBConn, DBConnCommonQueries
 
 __author__ = "Alex Ganin"
@@ -155,18 +154,12 @@ class VPDelaysCalculator:
 
   @staticmethod
   def _push_vpdelays_dbtpls(rows, pqDate):
-    sqlStmt = Queries["insertVPDelays"]
-    with DBConn() as con:
+    with DBConn() as conn:
       for row in rows:
-        tpl = (
-          pqDate, row.RouteId, row.TripId, row.StopId, row.StopName,
-          row.StopLat, row.StopLon, row.SchedDT, row.EstLat, row.EstLon,
-          row.EstDT, row.EstDist, row.EstDelay
-        )
-        con.execute(sqlStmt, tpl)
-        if con.uncommited % 1000 == 0:
-          con.commit()
-      con.commit()
+        dbtables.VPDelays.insertRow(conn, row, pqDate)
+        if conn.uncommited % 1000 == 0:
+          conn.commit()
+      conn.commit()
 
 
 class HlyDelaysCalculator:
@@ -324,23 +317,12 @@ class HlyDelaysCalculator:
 
   @staticmethod
   def _push_hlydelays_dbtpls(rows, pqDate, noRouteVal):
-    sqlStmt = Queries["insertHlyDelays"]
-    with DBConn() as con:
+    with DBConn() as conn:
       for row in rows:
-        tpl = (
-          pqDate,
-          row.DateEST, row.HourEST,
-          getattr(row, "RouteId", noRouteVal),
-          getattr(row, "StopName", None),
-          row.AvgDelay, row.AvgDist, row.Cnt,
-          getattr(row, "StopLat", None),
-          getattr(row, "StopLon", None),
-          getattr(row, "StopId", None)
-        )
-        con.execute(sqlStmt, tpl)
-        if con.uncommited % 1000 == 0:
-          con.commit()
-      con.commit()
+        dbtables.HlyDelays.insertRow(conn, row, pqDate, noRouteVal)
+        if conn.uncommited % 1000 == 0:
+          conn.commit()
+      conn.commit()
 
 
 class GTFSFetcher:
@@ -439,23 +421,6 @@ class GTFSFetcher:
     return gtfs.read_feed_descs(content)
 
 
-PqDate = namedtuple("PqDate", "Date IsInVPDelays IsInHlyDelays")
-
-
-def fetch_pqdates_to_update():
-  """Retrieves a list of Parquet files for which delays need to be calculated
-  """
-
-  ret = []
-  sqlStmt = Queries["selectPqDatesWhere"] %\
-    "NumRecs > 0 and (not IsInVPDelays or not IsInHlyDelays)"
-  with DBConn() as con:
-    cur = con.execute(sqlStmt)
-    for row in cur:
-      ret.append(PqDate(row[0], row[1], row[2]))
-  return ret
-
-
 def delete_pqdate_from_table(D, tableName):
   """Removes delays for a particular Parquet file from a delays table
 
@@ -467,23 +432,6 @@ def delete_pqdate_from_table(D, tableName):
   sqlStmt = """
     DELETE FROM `%s` WHERE D = '%s';
   """ % (tableName, D.strftime("%Y-%m-%d"))
-  with DBConn() as con:
-    con.execute(sqlStmt)
-    con.commit()
-
-
-def set_pqdate_flag(D, flag):
-  """Sets a column in a PqDates table to a value
-
-  Args:
-    D: Parquet file prefix for which the column should be set
-    flag: column name, e.g., IsInVPDelays or IsInHlyDelays
-  """
-
-  sqlStmt = """
-    UPDATE `PqDates` SET `%s` = True
-    WHERE D = '%s';
-  """ % (flag, D.strftime("%Y-%m-%d"))
   with DBConn() as con:
     con.execute(sqlStmt)
     con.commit()
@@ -510,9 +458,9 @@ def run(spark):
     spark: Spark Session object
   """
 
-  with DBConnCommonQueries() as con:
-    con.create_table("VPDelays", False)
-    con.create_table("HlyDelays", False)
+  with DBConnCommonQueries() as conn:
+    dbtables.create_if_not_exists(conn, dbtables.VPDelays)
+    dbtables.create_if_not_exists(conn, dbtables.HlyDelays)
 
   feedDescs = GTFSFetcher.readFeedDescs()
   curFeedDesc = None
@@ -520,7 +468,9 @@ def run(spark):
   feedRequiredFiles = ["stops.txt", "stop_times.txt", "trips.txt"]
 
   gtfsFetcher = GTFSFetcher(spark)
-  for entry in fetch_pqdates_to_update():
+  with DBConn() as conn:
+    entriesToProcess = dbtables.PqDates.selectPqDatesNotInDelays(conn)
+  for entry in entriesToProcess:
     targetDate = entry.Date
 
     if dfStopTimes is None or not curFeedDesc.includesDate(targetDate):
@@ -547,7 +497,8 @@ def run(spark):
       if not entry.IsInVPDelays:
         delete_pqdate_from_table(targetDate, "VPDelays")
         calcVPDelays.updateDB(dfVPDelays)
-        set_pqdate_flag(targetDate, "IsInVPDelays")
+        with DBConn() as conn:
+          dbtables.PqDates.updateInDelays(conn, targetDate, "IsInVPDelays")
 
       calcHlyDelays = HlyDelaysCalculator(spark, dfVPDelays)
       dfHlyDelays = calcHlyDelays.createResultDF().persist()
@@ -571,7 +522,8 @@ def run(spark):
         calcHlyDelays.updateDB(dfGrpAllBus, targetDate, "ALLBUSES")
         calcHlyDelays.updateDB(dfGrpStopsTrain, targetDate, "ALLTRAINS")
         calcHlyDelays.updateDB(dfGrpAllTrain, targetDate, "ALLTRAINS")
-        set_pqdate_flag(targetDate, "IsInHlyDelays")
+        with DBConn() as conn:
+          dbtables.PqDates.updateInDelays(conn, targetDate, "IsInHlyDelays")
 
 
 if __name__ == "__main__":

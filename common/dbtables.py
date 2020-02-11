@@ -118,6 +118,27 @@ class VehPosPb:
 
 
   @staticmethod
+  def selectProtobufKeysBetweenDates(conn, dt1, dt2):
+    """Retrieves S3 keys for Protobufs downloaded between two datetimes
+
+    Args:
+      conn: a DBConn instance
+      dt1, dt2: datetime between which the returned Protobufs were downloaded
+    """
+
+    sqlStmt = """
+      SELECT S3Key FROM `VehPosPb`
+      WHERE NumRecs > 0 and IsInVehPos and
+            S3KeyDT > %s and S3KeyDT < %s;
+      """
+    cur = conn.execute(sqlStmt, (dt1, dt2))
+    ret = []
+    for tpl in cur:
+      ret.append(tpl[0])
+    return ret
+
+
+  @staticmethod
   def updateInVehPos(conn, objKey):
     """Marks an S3 Protobuf key as processed into the VehPos table
 
@@ -128,9 +149,9 @@ class VehPosPb:
 
     sqlStmtMsk = """
       UPDATE `VehPosPb` SET `IsInVehPos` = True
-      WHERE S3Key = '%s';
-    """ % objKey
-    conn.execute(sqlStmtMsk)
+      WHERE S3Key = %s;
+    """
+    conn.execute(sqlStmtMsk, (objKey,))
 
 
   @staticmethod
@@ -243,3 +264,200 @@ class VehPos:
       VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s);
     """
     conn.executemany(sqlStmt, tpls)
+
+
+class PqDates:
+  """PqDates table helper class
+  """
+
+  TABLE_NAME = "PqDates"
+  CREATE_STMT = """
+    CREATE TABLE `PqDates` (
+      `D` Date PRIMARY KEY,
+      `NumKeys` integer NOT NULL,
+      `NumRecs` integer NOT NULL,
+      `IsInVPDelays` tinyint(1) DEFAULT '0',
+      `IsInHlyDelays` tinyint(1) DEFAULT '0'
+    );
+  """
+
+  @staticmethod
+  def selectExistingD(conn):
+    """Returns a dictionary of all D values from the database table
+
+    Args:
+      conn: a DBConn instance
+    """
+
+    sqlStmt = """
+      SELECT D FROM `PqDates`;
+    """
+    ret = {}
+    cur = conn.execute(sqlStmt)
+    for row in cur:
+      ret[row[0]] = 1
+    return ret
+
+
+  @staticmethod
+  def selectPqDatesNotInDelays(conn):
+    """Retrieves a list of Parquet files for which delays need to be calculated
+
+    Args:
+      conn: a DBConn instance
+    """
+
+    sqlStmt = """
+      SELECT D, IsInVPDelays, IsInHlyDelays FROM `PqDates`
+      WHERE NumRecs > 0 and (not IsInVPDelays or not IsInHlyDelays);
+    """
+    ret = []
+    cur = conn.execute(sqlStmt)
+    for row in cur:
+      ret.append({
+        "Date": row[0],
+        "IsInVPDelays": row[1],
+        "IsInHlyDelays": row[2]
+      })
+    return ret
+
+
+  @staticmethod
+  def updateInDelays(conn, D, delaysColName):
+    """Sets a column in a PqDates table to a value
+
+    Args:
+      conn: a DBConn instance
+      D: Parquet file prefix for which the column should be set
+      delaysColName: column name: IsInVPDelays or IsInHlyDelays
+    """
+
+    sqlStmt = """
+      UPDATE `PqDates` SET `%s` = True
+      WHERE D = '%s';
+    """ % (delaysColName, D.strftime("%Y-%m-%d"))
+    conn.execute(sqlStmt)
+
+
+  @staticmethod
+  def insertValues(conn, name, numKeys, numRecs):
+    """Inserts a record describing a newly created Parquet file into the table
+
+    Args:
+      conn: a DBConn instance
+      name: Parquet file date
+      numKeys: number of Protobuf files processed into that Parquet file
+      numRecs: number of vehicle position records in the Parquet file
+    """
+
+    sqlStmt = """
+      INSERT INTO `PqDates` (
+        D, NumKeys, NumRecs
+      )
+      VALUES (%s, %s, %s);
+    """
+    conn.execute(sqlStmt, (name, numKeys, numRecs))
+
+
+class VPDelays:
+  """VPDelays table helper class
+  """
+
+  TABLE_NAME = "VPDelays"
+  CREATE_STMT = """
+    CREATE TABLE `VPDelays` (
+      `D` Date NOT NULL,
+      `RouteId` char(50) DEFAULT NULL,
+      `TripId` char(50) NOT NULL,
+      `StopId` char(50) NOT NULL,
+      `StopName` char(200) DEFAULT NULL,
+      `StopLat` float NOT NULL,
+      `StopLon` float NOT NULL,
+      `SchedDT` DateTime NOT NULL,
+      `EstLat` float NOT NULL,
+      `EstLon` float NOT NULL,
+      `EstDT` DateTime NOT NULL,
+      `EstDist` float NOT NULL,
+      `EstDelay` float NOT NULL
+    );
+  """
+
+  @staticmethod
+  def insertRow(conn, row, pqDate):
+    """Inserts a dataframe row into the table
+
+    Args:
+      conn: a DBConn instance
+      row: a dataframe row to insert
+      pqDate: value for the `D` column of the table (Parquet file date)
+    """
+
+    sqlStmt = """
+      INSERT INTO `VPDelays` (
+        D, RouteId, TripId, StopId, StopName, StopLat, StopLon, SchedDT,
+        EstLat, EstLon, EstDT, EstDist, EstDelay
+      )
+      VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+    """
+
+    tpl = (
+      pqDate, row.RouteId, row.TripId, row.StopId, row.StopName,
+      row.StopLat, row.StopLon, row.SchedDT, row.EstLat, row.EstLon,
+      row.EstDT, row.EstDist, row.EstDelay
+    )
+    conn.execute(sqlStmt, tpl)
+
+
+class HlyDelays:
+  """HlyDelays table helper class
+  """
+
+  TABLE_NAME = "HlyDelays"
+  CREATE_STMT = """
+    CREATE TABLE `HlyDelays` (
+      `D` Date NOT NULL,
+      `DateEST` Date NOT NULL,
+      `HourEST` smallint NOT NULL,
+      `RouteId` char(50) DEFAULT NULL,
+      `StopName` char(200) DEFAULT NULL,
+      `AvgDelay` float NOT NULL,
+      `AvgDist` float NOT NULL,
+      `Cnt` integer NOT NULL,
+      `StopLat` float DEFAULT NULL,
+      `StopLon` float DEFAULT NULL,
+      `StopId` char(50) DEFAULT NULL
+    );
+  """
+
+  @staticmethod
+  def insertRow(conn, row, pqDate, noRouteVal):
+    """Inserts a dataframe row into the table
+
+    Args:
+      conn: a DBConn instance
+      row: a dataframe row to insert
+      pqDate: value for the `D` column of the table (Parquet file date)
+      noRouteVal: value to use when row has no RouteId, used for aggregations
+        for all buses or all trains when it's set to "ALLBUSES" or "ALLTRAINS"
+        instead of NULL
+    """
+
+    sqlStmt = """
+      INSERT INTO `HlyDelays` (
+        D, DateEST, HourEST, RouteId, StopName, AvgDelay, AvgDist, Cnt,
+        StopLat, StopLon, StopId
+      )
+      VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+    """
+
+    tpl = (
+      pqDate,
+      row.DateEST, row.HourEST,
+      getattr(row, "RouteId", noRouteVal),
+      getattr(row, "StopName", None),
+      row.AvgDelay, row.AvgDist, row.Cnt,
+      getattr(row, "StopLat", None),
+      getattr(row, "StopLon", None),
+      getattr(row, "StopId", None)
+    )
+    conn.execute(sqlStmt, tpl)

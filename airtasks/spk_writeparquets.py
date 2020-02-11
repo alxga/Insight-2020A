@@ -9,8 +9,7 @@ from pyspark.sql.types import StructType, StructField
 from pyspark.sql.types \
   import StringType, TimestampType, DoubleType, IntegerType
 
-from common import credentials, s3, gtfsrt
-from common.queries import Queries
+from common import credentials, dbtables
 from common.queryutils import DBConn, DBConnCommonQueries
 
 __author__ = "Alex Ganin"
@@ -28,15 +27,11 @@ def fetch_parquet_dts():
     dts.append(pfxDT)
     pfxDT += timedelta(days=1)
 
-  existing = {}
-  sqlStmt = Queries["selectPqDatesWhere"] % "True"
-  with DBConn() as con:
-    cur = con.execute(sqlStmt)
-    for row in cur:
-      existing[row[0]] = 1
+  with DBConn() as conn:
+    exD = dbtables.PqDates.selectExistingD(conn)
 
   for dt in dts:
-    if dt.date() not in existing:
+    if dt.date() not in exD:
       ret.append(dt)
 
   return ret
@@ -49,48 +44,11 @@ def fetch_keys_for_date(dt):
     dt: target Parquet file date
   """
 
-  sqlStmt = Queries["selectVehPosPb_forDate"]
-  with DBConn() as con:
+  with DBConn() as conn:
     # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
     dt1 = datetime(dt.year, dt.month, dt.day, 8)
     dt2 = dt1 + timedelta(days=1)
-    cur = con.execute(sqlStmt, (dt1, dt2))
-    ret = []
-    for tpl in cur:
-      ret.append(tpl[0])
-    return ret
-
-
-def fetch_tpls(objKey):
-  """Retrieves vehicle position tuples from a Protobuf file
-
-  Args:
-    objKey: Protobuf file S3 key
-  """
-
-  ret = []
-  s3Mgr = s3.S3Mgr()
-  data = s3Mgr.fetch_object_body(objKey)
-  gtfsrt.process_entities(data,
-      eachVehiclePos=lambda x: ret.append(gtfsrt.vehpos_pb2_to_dbtpl_dtlocal(x))
-  )
-  return ret
-
-
-def push_pqdate(name, numKeys, numRecs):
-  """Inserts a record describing a newly created Parquet file into the PqDates
-  table
-
-  Args:
-    name: Parquet file date
-    numKeys: number of Protobuf files processed into that Parquet file
-    numRecs: number of vehicle position records in the Parquet file
-  """
-
-  sqlStmt = Queries["insertPqDate"]
-  with DBConn() as con:
-    con.execute(sqlStmt, (name, numKeys, numRecs))
-    con.commit()
+    return dbtables.VehPosPb.selectProtobufKeysBetweenDates(conn, dt1, dt2)
 
 
 def run(spark):
@@ -100,11 +58,10 @@ def run(spark):
     spark: Spark Session object
   """
 
-  with DBConnCommonQueries() as con:
-    con.create_table("PqDates", False)
+  with DBConnCommonQueries() as conn:
+    dbtables.create_if_not_exists(conn, dbtables.PqDates)
 
   targetDates = fetch_parquet_dts()
-
   for targetDate in targetDates:
     keys = fetch_keys_for_date(targetDate)
     print("Got %d keys of %s" % (len(keys), str(targetDate)), flush=True)
@@ -112,7 +69,7 @@ def run(spark):
     if len(keys) > 0:
       rddVP = spark.sparkContext \
         .parallelize(keys) \
-        .flatMap(fetch_tpls) \
+        .flatMap(dbtables.VehPos.buildDFTuplesFromProtobuf) \
         .map(lambda tpl: ((tpl[1], tpl[3]), tpl)) \
         .reduceByKey(lambda x, y: x).map(lambda x: x[1])
 
@@ -139,7 +96,9 @@ def run(spark):
     else:
       numRecs = 0
 
-    push_pqdate(targetDate, len(keys), numRecs)
+    with DBConn() as conn:
+      dbtables.PqDates.insertValues(conn, targetDate, len(keys), numRecs)
+      conn.commit()
 
 
 if __name__ == "__main__":
