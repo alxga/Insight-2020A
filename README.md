@@ -1,7 +1,5 @@
 # MBTA: My Best Transit App
 
-
-
 ## Table of Contents
 1. [Architecture](README.md#architecture)
 1. [Deployment Instructions](README.md#deployment-instructions)
@@ -9,7 +7,16 @@
 1. [License](README.md#license)
 1. [Contact Information](README.md#contact-information)
 
+## Problem
+
+Urban transportation systems are vulnerable to congestion, accidents, weather, special events, and other costly delays. While the service quality data for the private transportation mode is readily available from large-scale studies such as Texas A&M Institute's [Urban Mobility Scorecard](https://mobility.tamu.edu/umr) the data on public transportation is normally published individually by different agencies in different cities and is often impossible to compare.
+
+## Solution
+
+Most of the public transportation agencies provide real-time information on the positions of their vehicles, trip updates, and alerts adhering to the [General Transit Feed Specification (GTFS) Real-Time (RT)](https://developers.google.com/transit/gtfs-realtime). This project takes a stab at building a scalable architecture to collect vehicle position (VP) feeds from public transportation agencies in different cities around the world by focusing on MBTA - Massachusetts Bay Transportation Authority. For illustration, I am using the VP data to provide information on service delays for every combination of stop and route on an hourly basis through a web user-interface. The UI also allows aggregation for all stops, for all routes, for bus routes only, for train routes only as well as skipping weekends or weekdays. Notably, the analyses on the positions data collected can be extended to include measurements of vehicle speeds on route segments or stop durations among others.
+
 ## Architecture
+
 The application collects General Transit Feed Specification (GTFS) Real-Time (RT) vehicle positions feeds (every 5 seconds) and GTFS schedule tables (once a day and only if there is an update) (both are published by the Massachusetts Bay Transportation Authority). The collected data are processed to provide hourly statistics on service delays (in seconds) through a user-friendly web-interface. The web-interface allows analysts accessing the data aggregated by routes, stops, or a combination thereof. The architecture of the system is described below.
 
 ![Architecture](frontend/static/img/architecture.png)
@@ -90,7 +97,6 @@ Name | Role
 **utils.py** | Generic helper functions
 
 ### **frontend/**
-
 Name | Role
 ---- | ----
 **api** | Flask blueprints for AJAX calls
