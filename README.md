@@ -8,6 +8,9 @@ The application collects General Transit Feed Specification (GTFS) Real-Time (RT
 1. [License](README.md#license)
 1. [Contact Information](README.md#contact-information)
 
+## Architecture
+![Architecture](frontend/static/img/architecture.png)
+
 ## Deployment Instructions
 
 * Create a MySQL or Amazon Aurora (in MySQL mode) database either in Amazon Web Services RDS or on an EC2 instance. The database should be accessible from the EC2 machines to be created as described below.
