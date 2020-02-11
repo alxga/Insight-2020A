@@ -1,4 +1,4 @@
-# MBTA: My Best Transit App
+# Arrivals-Watch by Alex Ganin
 
 ## Table of Contents
 1. [Problem](README.md#problem)
