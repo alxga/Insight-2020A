@@ -4,6 +4,7 @@ The application collects General Transit Feed Specification (GTFS) Real-Time (RT
 
 ## Table of Contents
 1. [Deployment Instructions](README.md#deployment-instructions)
+1. [Architecture](README.md#architecture)
 1. [Directory Structure](README.md#directory-structure)
 1. [License](README.md#license)
 1. [Contact Information](README.md#contact-information)
