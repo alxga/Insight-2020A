@@ -27,11 +27,11 @@ The system in its current implementation on AWS is composed of
   * 1st worker is responsible for running data downloads and runs 2 tasks
     * Every minute: a script collects GTFS RT data every 5 seconds during that minute (a thread is started every 5 seconds)
     * Every day: a script collects GTFS data if a new schedule has been published
-  * 2nd worker is responsible for data analysis on a Spark cluster. It runs an Airflow task graph once an hour. The graph defines a sequence of tasks where each task depends on the previous task. All of the tasks save their progress into 3 database metainformation tables. The tasks accomplish the following
-    1. Index downloaded real-time feeds in S3 and saving their metadata into the database
-    1. Read the protobuf files (vehicle position feeds) from S3 and insert records into a table for each vehicle position observed while removing duplicates
-    1. Write the vehicle positions into a Parquet file for each date, the day is defined to end at 3am US/Eastern time (when public transportation trips are infrequent)
-    1. Compute service delays for all trips and all routes and save to a table in the database, aggregate those on an hourly basis and save to a different table in the database
+  * 2nd worker is responsible for data analysis on a Spark cluster. It runs an Airflow task graph once an hour. The graph defines a sequence of tasks where each task depends on the previous task. All of the tasks save their progress information into 3 database tables so that the work is not done more than once. The tasks accomplish the following
+    1. Index downloaded real-time vehicle position feeds (Protobufs) in S3 and save the Protobuf metadata into the database
+    1. Read the Protobuf files from S3 and insert records into a table for each vehicle position observed while removing duplicates
+    1. Write the vehicle positions into a Parquet file for each date, the day is defined to end at 3am US/Eastern time (when public transportation trips are infrequent) (while the task is run every hour it only does the actual work once a day)
+    1. Compute service delays for all trips and all routes and save to a table in the database, aggregate those on an hourly basis and save to a different table in the database (this task is also run every hour but does the actual work only once a day)
 * a Spark cluster (6 m4.large instances) responsible to running the data processing tasks described above
 * a Flask-powered web server (1 t3.medium instance) responsible for presenting the data for exploration
 
@@ -50,17 +50,17 @@ The system in its current implementation on AWS is composed of
 
 * Create and configure an Airflow server and 2 workers, see examples [here](https://corecompete.com/scaling-out-airflow-with-celery-and-rabbitmq-to-orchestrate-etl-jobs-on-the-cloud)
   * Install Google Protocol Buffer libraries on each of the machines `sudo apt install protobuf-compiler`
-  * Install dependencies from the requirements.txt file in this repository
+  * Install dependencies from the requirements.txt file in this repository in a virtual environment (see the Spark configuration instructions for examples)
   * Create an additional queue named _sparks_ for Spark tasks
   * The second worker needs to be additionally configured by editing the file $AIRFLOW_HOME/airflow.cfg and setting the value `default_queue = sparks`
   * Place the file _air_dagbag.py_ in the directory $AIRFLOW_HOME/dags on all the Airflow machines
   * Run `airflow list_dags` and check that the three DAGs for the project are discovered by Airflow on each of the Airflow machines
   * Make sure that the following environment variables are set on each Airflow machine: MYSQL_HOST, MYSQL_USER, MYSQL_PWD, MYSQL_DBNAME, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION
-  * Start the Airflow server and workers as described at the link above
+  * Start the Airflow server and workers, e.g., `nohup airflow scheduler > ~/airflow/scheduler.out` for the scheduler or `nohup airflow webserver > ~/airflow/webserver.out` for the web server (see the link above)
   
-* Configure a Flask webserver on an additional Amazon Web Services EC2 instance
+* Configure a Flask web server on an additional Amazon Web Services EC2 instance
   * Install Google Protocol Buffer libraries on each of the machines `sudo apt install protobuf-compiler`
-  * Install dependencies from the requirements.txt file in this repository
+  * Install dependencies from the requirements.txt file in this repository in a virtual environment (see the Spark configuration instructions for examples)
   * Make sure that the following environment variables are set on the webserver machine: MYSQL_HOST, MYSQL_USER, MYSQL_PWD, MYSQL_DBNAME, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION
   * Configure and start **nginx**
   * Configure **supervisor** to run Flask and start the web server
@@ -148,4 +148,4 @@ This project is licensed under the MIT License
 
 ## Contact Information
 
-**Alex Ganin** - *Initial work* - [alxga](https://github.com/alxga)
+**Alex Ganin** - *Initial work* - [GitHub](https://github.com/alxga) [LinkedIn](https://www.linkedin.com/in/alexander-ganin)
