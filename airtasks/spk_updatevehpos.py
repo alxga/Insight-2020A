@@ -16,7 +16,7 @@ def push_vehpos_db(keyTpls):
 
   Args:
     keyTpls: a tuple of the form (key, tpls) where key is unused and tpls
-  are inserted into the table
+      are inserted into the table
   """
 
   with DBConn() as conn:

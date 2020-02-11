@@ -21,7 +21,6 @@ def fetch_parquet_dts():
   """
 
   ret = []
-  # strip time
   pfxDT = datetime(2020, 1, 1)
   utcNow = datetime.utcnow()
   dts = []

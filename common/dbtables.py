@@ -128,9 +128,9 @@ class VehPosPb:
 
     sqlStmtMsk = """
       UPDATE `VehPosPb` SET `IsInVehPos` = True
-      WHERE S3Key = %s;
-    """
-    conn.execute(sqlStmtMsk, objKey)
+      WHERE S3Key = '%s';
+    """ % objKey
+    conn.execute(sqlStmtMsk)
 
 
   @staticmethod
