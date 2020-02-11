@@ -148,7 +148,7 @@ class VehPosPb:
       )
       VALUES (%s, %s, %s, %s, %s);
     """
-    conn.execute(sqlStmt)
+    conn.execute(sqlStmt, tpl)
 
 
 class VehPos:
@@ -246,4 +246,4 @@ class VehPos:
       )
       VALUES(%s, %s, %s, %s, %s, %s, %s, %s, %s);
     """
-    conn.executemany(sqlStmt)
+    conn.executemany(sqlStmt, tpls)
