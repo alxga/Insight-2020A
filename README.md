@@ -56,6 +56,7 @@ Name | Role
 **air_dagbag.py** | Allows Airflow to discover task definition graphs in the **airdags/** folder, should be deployed to $AIRFLOW_HOME/dags and modified as described in the file to point to the **airdags/** folder
 **frontend_app.py** | Flask application start-up script
 **myspark.sh** | Helper Bash script to launch Spark jobs
+**requirements.txt** | Python packages requirements file
 
 ### **airdags/**
 Name | Role
