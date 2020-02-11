@@ -421,22 +421,6 @@ class GTFSFetcher:
     return gtfs.read_feed_descs(content)
 
 
-def delete_pqdate_from_table(D, tableName):
-  """Removes delays for a particular Parquet file from a delays table
-
-  Args:
-    D: Parquet file prefix
-    tableName: name of the table, e.g., VPDelays or HlyDelays
-  """
-
-  sqlStmt = """
-    DELETE FROM `%s` WHERE D = '%s';
-  """ % (tableName, D.strftime("%Y-%m-%d"))
-  with DBConn() as con:
-    con.execute(sqlStmt)
-    con.commit()
-
-
 def read_vp_parquet(spark, targetDate):
   """Creates a dataframe for a Parquet file
 
@@ -495,7 +479,9 @@ def run(spark):
       dfVPDelays = calcVPDelays.createResultDF()
 
       if not entry.IsInVPDelays:
-        delete_pqdate_from_table(targetDate, "VPDelays")
+        with DBConn() as conn:
+          dbtables.VPDelays.deleteForParquet(conn, targetDate)
+          conn.commit()
         calcVPDelays.updateDB(dfVPDelays)
         with DBConn() as conn:
           dbtables.PqDates.updateInDelays(conn, targetDate, "IsInVPDelays")
@@ -513,7 +499,9 @@ def run(spark):
       dfGrpAllTrain = calcHlyDelays.groupAll(dfHlyDelaysTrain)
 
       if not entry.IsInHlyDelays:
-        delete_pqdate_from_table(targetDate, "HlyDelays")
+        with DBConn() as conn:
+          dbtables.HlyDelays.deleteForParquet(conn, targetDate)
+          conn.commit()
         calcHlyDelays.updateDB(dfHlyDelays, targetDate)
         calcHlyDelays.updateDB(dfGrpRoutes, targetDate)
         calcHlyDelays.updateDB(dfGrpStops, targetDate)

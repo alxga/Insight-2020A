@@ -408,6 +408,21 @@ class VPDelays:
     conn.execute(sqlStmt, tpl)
 
 
+  @staticmethod
+  def deleteForParquet(conn, D):
+    """Removes records for a particular Parquet file from the table
+
+    Args:
+      conn: a DBConn instance
+      D: Parquet file date as saved in the table column `D`
+    """
+
+    sqlStmt = """
+      DELETE FROM `VPDelays` WHERE D = '%s';
+    """ % D.strftime("%Y-%m-%d")
+    conn.execute(sqlStmt)
+
+
 class HlyDelays:
   """HlyDelays table helper class
   """
@@ -461,3 +476,18 @@ class HlyDelays:
       getattr(row, "StopId", None)
     )
     conn.execute(sqlStmt, tpl)
+
+
+  @staticmethod
+  def deleteForParquet(conn, D):
+    """Removes records for a particular Parquet file from the table
+
+    Args:
+      conn: a DBConn instance
+      D: Parquet file date as saved in the table column `D`
+    """
+
+    sqlStmt = """
+      DELETE FROM `HlyDelays` WHERE D = '%s';
+    """ % D.strftime("%Y-%m-%d")
+    conn.execute(sqlStmt)
