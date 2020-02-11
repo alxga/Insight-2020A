@@ -9,36 +9,10 @@ from datetime import datetime
 import traceback
 
 import requests
-import mysql.connector
 
-from common import credentials
 from common import Settings, s3
-from common.queries import Queries
 
 __author__ = "Alex Ganin"
-
-
-def push_vehpospb_dbtpl(tpl):
-  """Inserts a record into the VehPosPb table
-
-  Args:
-    tpl: a tuple to save into the database
-  """
-
-  cnx = None
-  cursor = None
-  sqlStmt = Queries["insertVehPosPb"]
-
-  try:
-    cnx = mysql.connector.connect(**credentials.MySQLConnArgs)
-    cursor = cnx.cursor()
-    cursor.execute(sqlStmt, tpl)
-    cnx.commit()
-  finally:
-    if cursor:
-      cursor.close()
-    if cnx:
-      cnx.close()
 
 
 def download_feed(dirName, url, *args):
@@ -63,15 +37,6 @@ def download_feed(dirName, url, *args):
     s3Mgr = s3.S3Mgr()
     s3Mgr.upload_file(fPath, objKey)
     os.remove(fPath)
-
-    # Attempt to push records to the VehPosPb table when we're reading
-    # the vehicle positions feed
-    # This can be used to speed up the appearance of data in VehPos,
-    # but is disabled for now
-
-    # if dirName[0:3] == "Veh":
-    #   tpl = gtfsrt.vehpospb_pb2_to_dbtpl(objKey, r.content)
-    #   push_vehpospb_dbtpl(tpl)
 
   except Exception: # pylint: disable=broad-except
     print("Error while saving the file %s to S3 and/or DB" % fPath)

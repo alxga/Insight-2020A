@@ -28,7 +28,7 @@ def fetch_parquet_dts():
     pfxDT += timedelta(days=1)
 
   with DBConn() as conn:
-    exD = dbtables.PqDates.selectExistingD(conn)
+    exD = dbtables.PqDates.select_existing_pqdates(conn)
 
   for dt in dts:
     if dt.date() not in exD:
@@ -48,7 +48,7 @@ def fetch_keys_for_date(dt):
     # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
     dt1 = datetime(dt.year, dt.month, dt.day, 8)
     dt2 = dt1 + timedelta(days=1)
-    return dbtables.VehPosPb.selectProtobufKeysBetweenDates(conn, dt1, dt2)
+    return dbtables.VehPosPb.select_protobuf_keys_between_dates(conn, dt1, dt2)
 
 
 def run(spark):
@@ -69,7 +69,7 @@ def run(spark):
     if len(keys) > 0:
       rddVP = spark.sparkContext \
         .parallelize(keys) \
-        .flatMap(dbtables.VehPos.buildDFTuplesFromProtobuf) \
+        .flatMap(dbtables.VehPos.build_df_tuples_from_pb) \
         .map(lambda tpl: ((tpl[1], tpl[3]), tpl)) \
         .reduceByKey(lambda x, y: x).map(lambda x: x[1])
 
@@ -97,7 +97,7 @@ def run(spark):
       numRecs = 0
 
     with DBConn() as conn:
-      dbtables.PqDates.insertValues(conn, targetDate, len(keys), numRecs)
+      dbtables.PqDates.invert_values(conn, targetDate, len(keys), numRecs)
       conn.commit()
 
 

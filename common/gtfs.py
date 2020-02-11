@@ -27,7 +27,7 @@ class MBTA_ArchivedFeedDesc:
     self.note = None
 
 
-  def includesDate(self, d):
+  def includes_date(self, d):
     """Returns whether the feed is in effect on a given date
 
     Args:
@@ -37,7 +37,7 @@ class MBTA_ArchivedFeedDesc:
     return self.startDate <= d and d <= self.endDate
 
 
-  def includesFiles(self, fileLst):
+  def includes_files(self, fileLst):
     """Returns whether the feed files in S3 include given files
 
     Args:

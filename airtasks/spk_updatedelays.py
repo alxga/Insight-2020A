@@ -60,7 +60,7 @@ class VPDelaysCalculator:
     self.dfVehPos = dfVehPos
 
 
-  def createResultDF(self):
+  def create_result_df(self):
     """Creates the delays dataframe from the schedule and vehicle positions
     dataframes
     """
@@ -81,7 +81,7 @@ class VPDelaysCalculator:
     return self.spark.createDataFrame(rddVPDelays, self.TableSchema)
 
 
-  def updateDB(self, dfVPDelays):
+  def update_db(self, dfVPDelays):
     """Saves a delays dataframe to the database table VPDelays
     """
     pqDate = self.pqDate
@@ -156,7 +156,7 @@ class VPDelaysCalculator:
   def _push_vpdelays_dbtpls(rows, pqDate):
     with DBConn() as conn:
       for row in rows:
-        dbtables.VPDelays.insertRow(conn, row, pqDate)
+        dbtables.VPDelays.insert_row(conn, row, pqDate)
         if conn.uncommited % 1000 == 0:
           conn.commit()
       conn.commit()
@@ -211,7 +211,7 @@ class HlyDelaysCalculator:
     self.dfVPDelays = dfVPDelays
 
 
-  def createResultDF(self):
+  def create_result_df(self):
     """Aggregates a delays dataframe so that it has data grouped by
     Date (US/Eastern time), Hour (US/Eastern time), RouteId, and StopName
     """
@@ -247,7 +247,7 @@ class HlyDelaysCalculator:
     return dfResult
 
 
-  def groupRoutes(self, dfHlyDelays):
+  def group_routes(self, dfHlyDelays):
     """Additionally aggregates an hourly delays dataframe so that it has data
     groupped by Date (US/Eastern time), Hour (US/Eastern time), and RouteId
     """
@@ -265,7 +265,7 @@ class HlyDelaysCalculator:
     return dfResult
 
 
-  def groupStops(self, dfHlyDelays):
+  def group_stops(self, dfHlyDelays):
     """Additionally aggregates an hourly delays dataframe so that it has data
     groupped by Date (US/Eastern time), Hour (US/Eastern time), and StopName
     """
@@ -287,7 +287,7 @@ class HlyDelaysCalculator:
     return dfResult
 
 
-  def groupAll(self, dfHlyDelays):
+  def group_all(self, dfHlyDelays):
     """Additionally aggregates an hourly delays dataframe so that it has data
     groupped by Date (US/Eastern time) and Hour (US/Eastern time) only
     """
@@ -306,7 +306,7 @@ class HlyDelaysCalculator:
     return dfResult
 
 
-  def updateDB(self, dfHlyDelays, pqDate, noRouteVal=None):
+  def update_db(self, dfHlyDelays, pqDate, noRouteVal=None):
     """Saves a delays dataframe to the database table HlyDelays
     """
 
@@ -319,7 +319,7 @@ class HlyDelaysCalculator:
   def _push_hlydelays_dbtpls(rows, pqDate, noRouteVal):
     with DBConn() as conn:
       for row in rows:
-        dbtables.HlyDelays.insertRow(conn, row, pqDate, noRouteVal)
+        dbtables.HlyDelays.insert_row(conn, row, pqDate, noRouteVal)
         if conn.uncommited % 1000 == 0:
           conn.commit()
       conn.commit()
@@ -453,15 +453,15 @@ def run(spark):
 
   gtfsFetcher = GTFSFetcher(spark)
   with DBConn() as conn:
-    entriesToProcess = dbtables.PqDates.selectPqDatesNotInDelays(conn)
+    entriesToProcess = dbtables.PqDates.select_pqdates_not_in_delays(conn)
   for entry in entriesToProcess:
     targetDate = entry["Date"]
 
-    if dfStopTimes is None or not curFeedDesc.includesDate(targetDate):
+    if dfStopTimes is None or not curFeedDesc.includes_date(targetDate):
       curFeedDesc = None
       dfStopTimes = None
       for fd in feedDescs:
-        if fd.includesDate(targetDate) and fd.includesFiles(feedRequiredFiles):
+        if fd.includes_date(targetDate) and fd.includes_files(feedRequiredFiles):
           curFeedDesc = fd
           dfStopTimes = gtfsFetcher.readStopTimes(curFeedDesc)
           print('USING FEED "%s" for %s' % \
@@ -476,43 +476,43 @@ def run(spark):
 
       calcVPDelays = \
         VPDelaysCalculator(spark, targetDate, dfStopTimes, dfVehPos)
-      dfVPDelays = calcVPDelays.createResultDF()
+      dfVPDelays = calcVPDelays.create_result_df()
 
       if not entry["IsInVPDelays"]:
         with DBConn() as conn:
-          dbtables.VPDelays.deleteForParquet(conn, targetDate)
+          dbtables.VPDelays.delete_for_parquet(conn, targetDate)
           conn.commit()
-        calcVPDelays.updateDB(dfVPDelays)
+        calcVPDelays.update_db(dfVPDelays)
         with DBConn() as conn:
-          dbtables.PqDates.updateInDelays(conn, targetDate, "IsInVPDelays")
+          dbtables.PqDates.update_in_delays(conn, targetDate, "IsInVPDelays")
           conn.commit()
 
       calcHlyDelays = HlyDelaysCalculator(spark, dfVPDelays)
-      dfHlyDelays = calcHlyDelays.createResultDF().persist()
-      dfGrpRoutes = calcHlyDelays.groupRoutes(dfHlyDelays)
-      dfGrpStops = calcHlyDelays.groupStops(dfHlyDelays)
-      dfGrpAll = calcHlyDelays.groupAll(dfHlyDelays)
+      dfHlyDelays = calcHlyDelays.create_result_df().persist()
+      dfGrpRoutes = calcHlyDelays.group_routes(dfHlyDelays)
+      dfGrpStops = calcHlyDelays.group_stops(dfHlyDelays)
+      dfGrpAll = calcHlyDelays.group_all(dfHlyDelays)
       dfHlyDelaysBus = dfHlyDelays.filter(dfHlyDelays.RouteId.rlike("^[0-9]"))
       dfHlyDelaysTrain = dfHlyDelays.filter(~dfHlyDelays.RouteId.rlike("^[0-9]"))
-      dfGrpStopsBus = calcHlyDelays.groupStops(dfHlyDelaysBus)
-      dfGrpAllBus = calcHlyDelays.groupAll(dfHlyDelaysBus)
-      dfGrpStopsTrain = calcHlyDelays.groupStops(dfHlyDelaysTrain)
-      dfGrpAllTrain = calcHlyDelays.groupAll(dfHlyDelaysTrain)
+      dfGrpStopsBus = calcHlyDelays.group_stops(dfHlyDelaysBus)
+      dfGrpAllBus = calcHlyDelays.group_all(dfHlyDelaysBus)
+      dfGrpStopsTrain = calcHlyDelays.group_stops(dfHlyDelaysTrain)
+      dfGrpAllTrain = calcHlyDelays.group_all(dfHlyDelaysTrain)
 
       if not entry["IsInHlyDelays"]:
         with DBConn() as conn:
-          dbtables.HlyDelays.deleteForParquet(conn, targetDate)
+          dbtables.HlyDelays.delete_for_parquet(conn, targetDate)
           conn.commit()
-        calcHlyDelays.updateDB(dfHlyDelays, targetDate)
-        calcHlyDelays.updateDB(dfGrpRoutes, targetDate)
-        calcHlyDelays.updateDB(dfGrpStops, targetDate)
-        calcHlyDelays.updateDB(dfGrpAll, targetDate)
-        calcHlyDelays.updateDB(dfGrpStopsBus, targetDate, "ALLBUSES")
-        calcHlyDelays.updateDB(dfGrpAllBus, targetDate, "ALLBUSES")
-        calcHlyDelays.updateDB(dfGrpStopsTrain, targetDate, "ALLTRAINS")
-        calcHlyDelays.updateDB(dfGrpAllTrain, targetDate, "ALLTRAINS")
+        calcHlyDelays.update_db(dfHlyDelays, targetDate)
+        calcHlyDelays.update_db(dfGrpRoutes, targetDate)
+        calcHlyDelays.update_db(dfGrpStops, targetDate)
+        calcHlyDelays.update_db(dfGrpAll, targetDate)
+        calcHlyDelays.update_db(dfGrpStopsBus, targetDate, "ALLBUSES")
+        calcHlyDelays.update_db(dfGrpAllBus, targetDate, "ALLBUSES")
+        calcHlyDelays.update_db(dfGrpStopsTrain, targetDate, "ALLTRAINS")
+        calcHlyDelays.update_db(dfGrpAllTrain, targetDate, "ALLTRAINS")
         with DBConn() as conn:
-          dbtables.PqDates.updateInDelays(conn, targetDate, "IsInHlyDelays")
+          dbtables.PqDates.update_in_delays(conn, targetDate, "IsInHlyDelays")
           conn.commit()
 
 

@@ -32,7 +32,7 @@ class S3Prefixes:
 
 
   @staticmethod
-  def insertValues(conn, prefix, numRecs):
+  def invert_values(conn, prefix, numRecs):
     """Inserts a record in the table
 
     Args:
@@ -51,7 +51,7 @@ class S3Prefixes:
 
 
   @staticmethod
-  def selectPrefixesDict(conn):
+  def select_prefixes_dict(conn):
     """Returns a dictionary of all prefixes from the database table
 
     Args:
@@ -85,7 +85,7 @@ class VehPosPb:
   """
 
   @staticmethod
-  def buildTupleFromProtobuf(objKey):
+  def build_tuple_from_protobuf(objKey):
     """Builds a database tuple for a Protobuf object in S3
 
     Args:
@@ -107,7 +107,7 @@ class VehPosPb:
 
 
   @staticmethod
-  def selectProtobufKeysNotInVehPos(conn):
+  def select_protobuf_keys_not_invehpos(conn):
     """Retrieves S3 keys for Protobufs not yet in the VehPos table
 
     Args:
@@ -127,7 +127,7 @@ class VehPosPb:
 
 
   @staticmethod
-  def selectProtobufKeysBetweenDates(conn, dt1, dt2):
+  def select_protobuf_keys_between_dates(conn, dt1, dt2):
     """Retrieves S3 keys for Protobufs downloaded between two datetimes
 
     Args:
@@ -148,7 +148,7 @@ class VehPosPb:
 
 
   @staticmethod
-  def updateInVehPos(conn, objKey):
+  def update_invehpos(conn, objKey):
     """Marks an S3 Protobuf key as processed into the VehPos table
 
     Args:
@@ -164,7 +164,7 @@ class VehPosPb:
 
 
   @staticmethod
-  def insertTpl(conn, tpl):
+  def insert_tpl(conn, tpl):
     """Inserts a record into the table
 
     Args:
@@ -202,7 +202,7 @@ class VehPos:
   """
 
   @staticmethod
-  def buildDBTuplesFromProtobuf(objKey):
+  def build_db_tuples_from_pb(objKey):
     """Retrieves vehicle position tuples from a Protobuf file
 
     Timestamps are converted to naive UTC datetimes. Use this function to
@@ -231,7 +231,7 @@ class VehPos:
 
   # use this to create a pyspark Dataframe
   @staticmethod
-  def buildDFTuplesFromProtobuf(objKey):
+  def build_df_tuples_from_pb(objKey):
     """Retrieves vehicle position tuples from a Protobuf file
 
     Timestamps are converted to naive local datetimes. Use this function to
@@ -258,7 +258,7 @@ class VehPos:
     return ret
 
   @staticmethod
-  def insertTpls(conn, tpls):
+  def insert_tpls(conn, tpls):
     """Inserts multiple records into the table through an executemany call
 
     Args:
@@ -291,7 +291,7 @@ class PqDates:
   """
 
   @staticmethod
-  def selectExistingD(conn):
+  def select_existing_pqdates(conn):
     """Returns a dictionary of all Parquet dates from the database table
 
     Args:
@@ -309,7 +309,7 @@ class PqDates:
 
 
   @staticmethod
-  def selectPqDatesNotInDelays(conn):
+  def select_pqdates_not_in_delays(conn):
     """Retrieves a list of Parquet files for which delays need to be calculated
 
     Args:
@@ -332,7 +332,7 @@ class PqDates:
 
 
   @staticmethod
-  def updateInDelays(conn, D, delaysColName):
+  def update_in_delays(conn, D, delaysColName):
     """Sets a delays column in a PqDates table to True
 
     Args:
@@ -349,7 +349,7 @@ class PqDates:
 
 
   @staticmethod
-  def insertValues(conn, name, numKeys, numRecs):
+  def invert_values(conn, name, numKeys, numRecs):
     """Inserts a record describing a newly created Parquet file into the table
 
     Args:
@@ -392,7 +392,7 @@ class VPDelays:
   """
 
   @staticmethod
-  def insertRow(conn, row, pqDate):
+  def insert_row(conn, row, pqDate):
     """Inserts a dataframe row into the table
 
     Args:
@@ -418,7 +418,7 @@ class VPDelays:
 
 
   @staticmethod
-  def deleteForParquet(conn, D):
+  def delete_for_parquet(conn, D):
     """Removes records for a particular Parquet file from the table
 
     Args:
@@ -454,7 +454,7 @@ class HlyDelays:
   """
 
   @staticmethod
-  def insertRow(conn, row, pqDate, noRouteVal):
+  def insert_row(conn, row, pqDate, noRouteVal):
     """Inserts a dataframe row into the table
 
     Args:
@@ -488,7 +488,7 @@ class HlyDelays:
 
 
   @staticmethod
-  def deleteForParquet(conn, D):
+  def delete_for_parquet(conn, D):
     """Removes records for a particular Parquet file from the table
 
     Args:

@@ -33,7 +33,7 @@ def explore_s3prefixes():
     pfxDT += timedelta(hours=1)
 
   with DBConn() as conn:
-    exPrefixes = dbtables.S3Prefixes.selectPrefixesDict(conn)
+    exPrefixes = dbtables.S3Prefixes.select_prefixes_dict(conn)
 
   for pfx in pfxs:
     if pfx not in exPrefixes:
@@ -51,7 +51,7 @@ def push_vehpospb_dbtpls(tpls):
 
   with DBConn() as conn:
     for tpl in tpls:
-      dbtables.VehPosPb.insertTpl(conn, tpl)
+      dbtables.VehPosPb.insert_tpl(conn, tpl)
       if conn.uncommited % 1000 == 0:
         conn.commit()
     conn.commit()
@@ -77,13 +77,13 @@ def run(spark):
       print("PROCESSING %d KEYS FOR %s" % (len(keys), pfx))
       file_list = spark.sparkContext.parallelize(keys)
       file_list \
-        .map(dbtables.VehPosPb.buildTupleFromProtobuf) \
+        .map(dbtables.VehPosPb.build_tuple_from_protobuf) \
         .foreachPartition(push_vehpospb_dbtpls)
       print("PROCESSED %d KEYS FOR %s" % (len(keys), pfx))
     tpl = (pfx, len(keys))
 
     with DBConn() as conn:
-      dbtables.S3Prefixes.insertValues(conn, pfx, len(keys))
+      dbtables.S3Prefixes.invert_values(conn, pfx, len(keys))
       conn.commit()
     print("PUSHED S3Prefix %s" % str(tpl))
 

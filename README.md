@@ -81,9 +81,9 @@ Name | Role
 ---- | ----
 **\_\_init__.py** | Converts this folder to a Python package to simplify imports
 **appex.py** | Application-defined exceptions
+**dbtables.py** | Database tables and SQL queries to run on them
 **gtfs.py** | Helpers to parse GTFS feeds from zip archives
 **gtfsrt.py** | Helpers to parse Protocol Buffers files
-**queries.py** | Query strings
 **queryutils.py** | Helpers to connect to the database and run common queries
 **s3.py** | Helpers to work with S3
 **settings.py** | Application configuration

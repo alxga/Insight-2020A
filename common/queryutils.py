@@ -3,7 +3,6 @@
 import mysql.connector
 
 from .credentials import MySQLConnArgs
-from .queries import Queries
 
 __author__ = "Alex Ganin"
 
@@ -107,40 +106,19 @@ class DBConnCommonQueries(DBConn):
     self.commit()
 
 
-  def create_table(self, tableName, rewriteIfExists):
-    """Creates a table in the database
-
-    Args:
-      tableName: name of the table to create, the schema must be defined
-        in a query in the Queries dictionary with the key of the form
-        "create" + tableName
-      rewriteIfExists: if True and the table already exists it will be dropped
-        and created again, if False and the table already exists no action will
-        be taken
-
-    Returns:
-      True if a table was created, False if it already existed and was unchanged
-    """
-
-    createSqlStmt = Queries["create" + tableName]
-    if self.table_exists(tableName):
-      if rewriteIfExists:
-        self.drop_table(tableName)
-      else:
-        return False
-    self.execute(createSqlStmt)
-    self.commit()
-    return True
-
-
   def count_approx(self, tableName):
     """Returns an approximate number of records in a table
 
     Args:
       tableName: name of the table whose number of records to return
     """
-    sqlStmt = Queries["countApprox"] % tableName
-    cur = self.execute(sqlStmt)
+
+    sqlStmt = """
+      SELECT table_rows "Rows Count"
+      FROM information_schema.tables
+      WHERE table_name = %s;
+    """
+    cur = self.execute(sqlStmt, (tableName,))
     return next(cur)[0]
 
 
@@ -151,6 +129,9 @@ class DBConnCommonQueries(DBConn):
       tableName: name of the table whose number of records to return
       sqlWhere: an optional WHERE expression to filter the records
     """
-    sqlStmt = Queries["countApprox"] % (tableName, sqlWhere)
+
+    sqlStmt = """
+      SELECT count(*) FROM `%s` WHERE %s;
+    """ % (tableName, sqlWhere)
     cur = self.execute(sqlStmt)
     return next(cur)[0]

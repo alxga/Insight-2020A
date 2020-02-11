@@ -24,11 +24,11 @@ def push_vehpos_db(keyTpls):
     for keyTpl in keyTpls:
       tpls.append(keyTpl[1])
       if len(tpls) >= 100:
-        dbtables.VehPos.insertTpls(conn, tpls)
+        dbtables.VehPos.insert_tpls(conn, tpls)
         conn.commit()
         tpls = []
     if len(tpls) > 0:
-      dbtables.VehPos.insertTpls(conn, tpls)
+      dbtables.VehPos.insert_tpls(conn, tpls)
       conn.commit()
 
 
@@ -41,7 +41,7 @@ def set_vehpospb_invehpos(objKeys):
 
   with DBConn() as conn:
     for objKey in objKeys:
-      dbtables.VehPosPb.updateInVehPos(conn, objKey)
+      dbtables.VehPosPb.update_invehpos(conn, objKey)
       if conn.uncommited >= 100:
         conn.commit()
     conn.commit()
@@ -58,7 +58,7 @@ def run(spark):
     dbtables.create_if_not_exists(conn, dbtables.VehPos)
 
   with DBConn() as conn:
-    keys = dbtables.VehPosPb.selectProtobufKeysNotInVehPos(conn)
+    keys = dbtables.VehPosPb.select_protobuf_keys_not_invehpos(conn)
   print("Got %d keys" % len(keys), flush=True)
 
   step = 1000
@@ -68,7 +68,7 @@ def run(spark):
     keysSubrange = keys[lower:upper]
     records = spark.sparkContext \
       .parallelize(keysSubrange) \
-      .flatMap(dbtables.VehPos.buildDBTuplesFromProtobuf) \
+      .flatMap(dbtables.VehPos.build_db_tuples_from_pb) \
       .map(lambda tpl: ((tpl[1], tpl[3]), tpl)) \
       .reduceByKey(lambda x, y: x)
 
