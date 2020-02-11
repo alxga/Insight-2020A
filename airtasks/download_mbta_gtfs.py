@@ -1,4 +1,4 @@
-"""Functions to download MBTA schedule if it's updated"""
+"""Script to download MBTA schedule if it's updated"""
 
 import zipfile
 

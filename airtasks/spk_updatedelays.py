@@ -46,14 +46,15 @@ class VPDelaysCalculator:
 
 
   def __init__(self, spark, pqDate, dfStopTimes, dfVehPos):
-  """Initializes the instance
-  
-  Args:
-    spark: Spark Session object
-    pqDate: a date of the Parquet file with vehicle positions
-    dfStopTimes: dataframe of stop times from the schedule
-    dfVehPos: dataframe of vehicle positions
-  """
+    """Initializes the instance
+
+    Args:
+      spark: Spark Session object
+      pqDate: a date of the Parquet file with vehicle positions
+      dfStopTimes: dataframe of stop times from the schedule
+      dfVehPos: dataframe of vehicle positions
+    """
+
     self.spark = spark
     self.pqDate = pqDate
     self.dfStopTimes = dfStopTimes
@@ -61,9 +62,10 @@ class VPDelaysCalculator:
 
 
   def createResultDF(self):
-  """Creates the delays dataframe from the schedule and vehicle positions
-  dataframes
-  """
+    """Creates the delays dataframe from the schedule and vehicle positions
+    dataframes
+    """
+
     rddStopTimes = self.dfStopTimes.rdd \
       .map(lambda rec: (rec.trip_id, tuple(rec))) \
       .groupByKey()
@@ -81,8 +83,8 @@ class VPDelaysCalculator:
 
 
   def updateDB(self, dfVPDelays):
-  """Saves a delays dataframe to the database table VPDelays
-  """
+    """Saves a delays dataframe to the database table VPDelays
+    """
     pqDate = self.pqDate
     dfVPDelays.foreachPartition(lambda rows:
         VPDelaysCalculator._push_vpdelays_dbtpls(rows, pqDate)
@@ -119,6 +121,7 @@ class VPDelaysCalculator:
 
     return VPDelaysCalculator._calc_delays(stopTimeLst, vehPosLst)
 
+
   @staticmethod
   def _calc_delays(stopTimeLst, vehPosLst):
     ret = []
@@ -149,6 +152,7 @@ class VPDelaysCalculator:
       ))
     return ret
 
+
   @staticmethod
   def _push_vpdelays_dbtpls(rows, pqDate):
     sqlStmt = Queries["insertVPDelays"]
@@ -170,6 +174,7 @@ class HlyDelaysCalculator:
 
   Aggregates data on delays by date and hour in the US/Eastern timezone
   """
+
   TableSchema = StructType([
     StructField("DateEST", DateType(), False),
     StructField("HourEST", IntegerType(), False),
@@ -190,30 +195,34 @@ class HlyDelaysCalculator:
 
   @staticmethod
   def datetime_to_datehour(dt):
-  """Converts a UTC datetime to a date and hour in the US/Eastern time zone
+    """Converts a UTC datetime to a date and hour in the US/Eastern time zone
 
-  Args:
-    dt: datetime to convert
-  """
+    Args:
+      dt: datetime to convert
+    """
+
     dt = dt.replace(tzinfo=pytz.UTC) \
         .astimezone(pytz.timezone("US/Eastern"))
     return (dt.date(), dt.hour)
 
 
   def __init__(self, spark, dfVPDelays):
-  """Initializes the instance
-  
-  Args:
-    spark: Spark Session object
-    dfVPDelays: dataframe containing unaggregated delays for trips and stops
-  """
+    """Initializes the instance
+
+    Args:
+      spark: Spark Session object
+      dfVPDelays: dataframe containing unaggregated delays for trips and stops
+    """
+
     self.spark = spark
     self.dfVPDelays = dfVPDelays
 
+
   def createResultDF(self):
-  """Aggregates a delays dataframe so that it has data groupped by
-  Date (US/Eastern time), Hour (US/Eastern time), RouteId, and StopName
-  """
+    """Aggregates a delays dataframe so that it has data groupped by
+    Date (US/Eastern time), Hour (US/Eastern time), RouteId, and StopName
+    """
+
     udf_datetime_to_datehour = F.udf(
       HlyDelaysCalculator.datetime_to_datehour,
       HlyDelaysCalculator.DateHour
@@ -244,10 +253,12 @@ class HlyDelaysCalculator:
 
     return dfResult
 
+
   def groupRoutes(self, dfHlyDelays):
-  """Additionally aggregates an hourly delays dataframe so that it has data
-  groupped by Date (US/Eastern time), Hour (US/Eastern time), and RouteId
-  """
+    """Additionally aggregates an hourly delays dataframe so that it has data
+    groupped by Date (US/Eastern time), Hour (US/Eastern time), and RouteId
+    """
+
     dfResult = dfHlyDelays \
       .groupBy(
           dfHlyDelays.DateEST, dfHlyDelays.HourEST, dfHlyDelays.RouteId
@@ -260,10 +271,12 @@ class HlyDelaysCalculator:
           F.sum(dfHlyDelays.Cnt).alias("Cnt"))
     return dfResult
 
+
   def groupStops(self, dfHlyDelays):
-  """Additionally aggregates an hourly delays dataframe so that it has data
-  groupped by Date (US/Eastern time), Hour (US/Eastern time), and StopName
-  """
+    """Additionally aggregates an hourly delays dataframe so that it has data
+    groupped by Date (US/Eastern time), Hour (US/Eastern time), and StopName
+    """
+
     dfResult = dfHlyDelays \
       .groupBy(
           dfHlyDelays.DateEST, dfHlyDelays.HourEST, dfHlyDelays.StopName
@@ -280,10 +293,12 @@ class HlyDelaysCalculator:
       )
     return dfResult
 
+
   def groupAll(self, dfHlyDelays):
-  """Additionally aggregates an hourly delays dataframe so that it has data
-  groupped by Date (US/Eastern time) and Hour (US/Eastern time) only
-  """
+    """Additionally aggregates an hourly delays dataframe so that it has data
+    groupped by Date (US/Eastern time) and Hour (US/Eastern time) only
+    """
+
     dfResult = dfHlyDelays \
       .groupBy(
           dfHlyDelays.DateEST, dfHlyDelays.HourEST
@@ -299,11 +314,13 @@ class HlyDelaysCalculator:
 
 
   def updateDB(self, dfHlyDelays, pqDate, noRouteVal=None):
-  """Saves a delays dataframe to the database table HlyDelays
-  """
+    """Saves a delays dataframe to the database table HlyDelays
+    """
+
     dfHlyDelays.foreachPartition(lambda rows:
         HlyDelaysCalculator._push_hlydelays_dbtpls(rows, pqDate, noRouteVal)
     )
+
 
   @staticmethod
   def _push_hlydelays_dbtpls(rows, pqDate, noRouteVal):
@@ -331,11 +348,12 @@ class GTFSFetcher:
   """
 
   def __init__(self, spark):
-  """Initializes the instance
-  
-  Args:
-    spark: Spark Session object
-  """
+    """Initializes the instance
+
+    Args:
+      spark: Spark Session object
+    """
+
     self.spark = spark
 
 
@@ -350,12 +368,14 @@ class GTFSFetcher:
       .withColumn("stop_lon", dfStops.stop_lon.cast(DoubleType()))
     return dfStops.filter("location_type = 0")
 
+
   def _fetch_trips_df(self, prefix):
     _objKey = '/'.join([prefix, "trips.txt"])
     _objUri = "s3a://%s/%s" % (Settings.S3BucketName, _objKey)
     dfTrips = self.spark.read.csv(_objUri, header=True)
     colNames = ["trip_id", "route_id"]
     return dfTrips.select(colNames)
+
 
   def _fetch_stop_times_df(self, prefix):
     _objKey = '/'.join([prefix, "stop_times.txt"])
@@ -382,11 +402,12 @@ class GTFSFetcher:
 
 
   def readStopTimes(self, feedDesc):
-  """Reads a GTFS feed and returns a stop times dataframe
+    """Reads a GTFS feed and returns a stop times dataframe
 
-  Args:
-    feedDesc: an MBTA_ArchivedFeedDesc object
-  """  
+    Args:
+      feedDesc: an MBTA_ArchivedFeedDesc object
+    """
+
     prefix = '/'.join(["GTFS", feedDesc.s3Key])
 
     # rename some columns to disambiguate after joining the tables
@@ -409,8 +430,9 @@ class GTFSFetcher:
 
   @staticmethod
   def readFeedDescs():
-  """Retrieves a list of GTFS feed descriptions available on S3
-  """  
+    """Retrieves a list of GTFS feed descriptions available on S3
+    """
+
     objKey = '/'.join(["GTFS", "MBTA_archived_feeds.txt"])
     s3Mgr = s3.S3Mgr()
     content = s3Mgr.fetch_object_body(objKey)
@@ -419,9 +441,11 @@ class GTFSFetcher:
 
 PqDate = namedtuple("PqDate", "Date IsInVPDelays IsInHlyDelays")
 
+
 def fetch_pqdates_to_update():
   """Retrieves a list of Parquet files for which delays need to be calculated
-  """  
+  """
+
   ret = []
   sqlStmt = Queries["selectPqDatesWhere"] %\
     "NumRecs > 0 and (not IsInVPDelays or not IsInHlyDelays)"
@@ -438,7 +462,8 @@ def delete_pqdate_from_table(D, tableName):
   Args:
     D: Parquet file prefix
     tableName: name of the table, e.g., VPDelays or HlyDelays
-  """  
+  """
+
   sqlStmt = """
     DELETE FROM `%s` WHERE D = '%s';
   """ % (tableName, D.strftime("%Y-%m-%d"))
@@ -453,7 +478,8 @@ def set_pqdate_flag(D, flag):
   Args:
     D: Parquet file prefix for which the column should be set
     flag: column name, e.g., IsInVPDelays or IsInHlyDelays
-  """  
+  """
+
   sqlStmt = """
     UPDATE `PqDates` SET `%s` = True
     WHERE D = '%s';
@@ -469,7 +495,8 @@ def read_vp_parquet(spark, targetDate):
   Args:
     spark: Spark Session object
     targetDate: date for which to read the Parquet
-  """  
+  """
+
   objUri = "VP-" + targetDate.strftime("%Y%m%d")
   objUri = "s3a://" + '/'.join((Settings.S3BucketName, "parquet", objUri))
   return spark.read.parquet(objUri)

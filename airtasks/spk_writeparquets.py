@@ -1,3 +1,6 @@
+"""Module to update Parquet files in S3 and the PqDate table
+"""
+
 import os
 from datetime import datetime, timedelta
 
@@ -14,6 +17,9 @@ __author__ = "Alex Ganin"
 
 
 def fetch_parquet_dts():
+  """Computes dates for which Parquet files need to be created
+  """
+
   ret = []
   # strip time
   pfxDT = datetime(2020, 1, 1)
@@ -38,6 +44,12 @@ def fetch_parquet_dts():
 
 
 def fetch_keys_for_date(dt):
+  """Retrieves Protobuf files S3 keys for a Parquet date
+
+  Args:
+    dt: target Parquet file date
+  """
+
   sqlStmt = Queries["selectVehPosPb_forDate"]
   with DBConn() as con:
     # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
@@ -51,6 +63,12 @@ def fetch_keys_for_date(dt):
 
 
 def fetch_tpls(objKey):
+  """Retrieves vehicle position tuples from a Protobuf file
+
+  Args:
+    objKey: Protobuf file S3 key
+  """
+
   ret = []
   s3Mgr = s3.S3Mgr()
   data = s3Mgr.fetch_object_body(objKey)
@@ -61,6 +79,15 @@ def fetch_tpls(objKey):
 
 
 def push_pqdate(name, numKeys, numRecs):
+  """Inserts a record describing a newly created Parquet file into the PqDates
+  table
+
+  Args:
+    name: Parquet file date
+    numKeys: number of Protobuf files processed into that Parquet file
+    numRecs: number of vehicle position records in the Parquet file
+  """
+
   sqlStmt = Queries["insertPqDate"]
   with DBConn() as con:
     con.execute(sqlStmt, (name, numKeys, numRecs))
@@ -68,6 +95,12 @@ def push_pqdate(name, numKeys, numRecs):
 
 
 def run(spark):
+  """Updates Parquet files in S3 and the PqDate table
+
+  Args:
+    spark: Spark Session object
+  """
+
   with DBConnCommonQueries() as con:
     con.create_table("PqDates", False)
 

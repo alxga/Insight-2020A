@@ -1,3 +1,6 @@
+"""Module to update the vehicle positions database table
+"""
+
 import os
 
 from pyspark.sql import SparkSession
@@ -10,10 +13,14 @@ __author__ = "Alex Ganin"
 
 
 def fetch_keys_to_update():
+  """Retrieves S3 keys for Protobufs not yet in the VehPos table
+  """
+
   sqlStmt = """
     SELECT S3Key FROM `VehPosPb`
     WHERE NumRecs > 0 and not IsInVehPos;
   """
+
   ret = []
   with DBConn() as con:
     cur = con.execute(sqlStmt)
@@ -23,6 +30,12 @@ def fetch_keys_to_update():
 
 
 def fetch_tpls(objKey):
+  """Retrieves vehicle position tuples for a Protobuf file
+
+  Args:
+    objKey: Protobuf S3 key
+  """
+
   ret = []
   s3Mgr = s3.S3Mgr()
   data = s3Mgr.fetch_object_body(objKey)
@@ -33,6 +46,13 @@ def fetch_tpls(objKey):
 
 
 def push_vehpos_db(keyTpls):
+  """Adds records to the VehPos table
+
+  Args:
+    keyTpls: a tuple of the form (key, tpls) where key is unused and tpls
+  are inserted into the table
+  """
+
   sqlStmt = Queries["insertVehPos"]
   with DBConn() as con:
     tpls = []
@@ -48,6 +68,12 @@ def push_vehpos_db(keyTpls):
 
 
 def set_vehpospb_invehpos(objKeys):
+  """Marks S3 Protobuf keys as processed into the VehPos table
+
+  Args:
+    objKeys: keys for the Protobuf S3 objects
+  """
+
   sqlStmtMsk = """
     UPDATE `VehPosPb` SET `IsInVehPos` = True
     WHERE S3Key = '%s';
@@ -61,6 +87,12 @@ def set_vehpospb_invehpos(objKeys):
 
 
 def run(spark):
+  """Updates the vehicle positions database table
+
+  Args:
+    spark: Spark Session object
+  """
+
   keys = fetch_keys_to_update()
   print("Got %d keys" % len(keys), flush=True)
 

@@ -1,3 +1,7 @@
+"""Script to download MBTA vehicle positions every 5 seconds
+during 1 minute
+"""
+
 import os
 import time
 import threading

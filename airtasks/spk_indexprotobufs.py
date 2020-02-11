@@ -54,6 +54,7 @@ def create_vehpospb_tpl(objKey):
   Args:
     objKey: S3 key of the Protobuf file
   """
+
   s3Mgr = s3.S3Mgr()
   data = s3Mgr.fetch_object_body(objKey)
   return gtfsrt.vehpospb_pb2_to_dbtpl(objKey, data)
@@ -65,6 +66,7 @@ def push_vehpospb_dbtpls(tpls):
   Args:
     tpls: records to add, each contains metadata for a single Protobuf file
   """
+
   sqlStmt = Queries["insertVehPosPb"]
   with DBConn() as con:
     for tpl in tpls:
@@ -80,6 +82,7 @@ def push_s3prefix(name, numKeys):
     name: an S3 prefix, e.g., '20200115/10'
     numKeys: number of Protobuf files under this prefix
   """
+
   sqlStmt = Queries["insertS3Prefix"]
   with DBConn() as con:
     con.execute(sqlStmt, (name, numKeys))
@@ -92,6 +95,7 @@ def run(spark):
   Args:
     spark: Spark Session object
   """
+
   with DBConnCommonQueries() as con:
     con.create_table("S3Prefixes", False)
 
