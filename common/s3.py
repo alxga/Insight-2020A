@@ -78,6 +78,7 @@ class S3Mgr:
     Args:
       objKey: key of the object whose contents to write
     """
+
     obj = self._Res.Object(self.bucketName, objKey)
     obj.put(Body=data)
 
@@ -89,6 +90,7 @@ class S3Mgr:
       fPath: path of a local file to upload
       objKey: key of the object for the file contents
     """
+
     self._Res.Object(self.bucketName, objKey).upload_file(fPath)
 
 
@@ -98,6 +100,7 @@ class S3Mgr:
     Args:
       prefix: prefix to check
     """
+
     result = self._Client.list_objects_v2(
         Bucket=self.bucketName, MaxKeys=1, Prefix=prefix
     )
@@ -107,6 +110,7 @@ class S3Mgr:
 def S3FeedKeyDT(objKey):
   """Extracts a datetime from an S3 Protobuf file key
   """
+
   dtval = objKey[-18:-3] # Naming assumed: 'pb/<Feed Name>/YYYYMMDD/HHMMSS.pb2'
   dt = datetime.strptime(dtval, "%Y%m%d/%H%M%S")
   return dt
