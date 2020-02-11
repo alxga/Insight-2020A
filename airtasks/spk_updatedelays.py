@@ -455,7 +455,7 @@ def run(spark):
   with DBConn() as conn:
     entriesToProcess = dbtables.PqDates.selectPqDatesNotInDelays(conn)
   for entry in entriesToProcess:
-    targetDate = entry.Date
+    targetDate = entry["Date"]
 
     if dfStopTimes is None or not curFeedDesc.includesDate(targetDate):
       curFeedDesc = None
@@ -478,7 +478,7 @@ def run(spark):
         VPDelaysCalculator(spark, targetDate, dfStopTimes, dfVehPos)
       dfVPDelays = calcVPDelays.createResultDF()
 
-      if not entry.IsInVPDelays:
+      if not entry["IsInVPDelays"]:
         with DBConn() as conn:
           dbtables.VPDelays.deleteForParquet(conn, targetDate)
           conn.commit()
@@ -498,7 +498,7 @@ def run(spark):
       dfGrpStopsTrain = calcHlyDelays.groupStops(dfHlyDelaysTrain)
       dfGrpAllTrain = calcHlyDelays.groupAll(dfHlyDelaysTrain)
 
-      if not entry.IsInHlyDelays:
+      if not entry["IsInHlyDelays"]:
         with DBConn() as conn:
           dbtables.HlyDelays.deleteForParquet(conn, targetDate)
           conn.commit()

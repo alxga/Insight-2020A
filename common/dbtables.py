@@ -1,9 +1,18 @@
+"""Database tables helper classes"""
+
 from datetime import datetime
 
 from . import s3
 from . import gtfsrt
 
 def create_if_not_exists(conn, cls):
+  """Creates a table if it doesn't exist
+
+  Args:
+    conn: a DBConnCommonQueries instance
+    cls: table class, e.g., VehPos
+  """
+
   if not conn.table_exists(cls.TABLE_NAME):
     conn.execute(cls.CREATE_STMT)
     conn.commit()
@@ -283,7 +292,7 @@ class PqDates:
 
   @staticmethod
   def selectExistingD(conn):
-    """Returns a dictionary of all D values from the database table
+    """Returns a dictionary of all Parquet dates from the database table
 
     Args:
       conn: a DBConn instance
@@ -324,12 +333,12 @@ class PqDates:
 
   @staticmethod
   def updateInDelays(conn, D, delaysColName):
-    """Sets a column in a PqDates table to a value
+    """Sets a delays column in a PqDates table to True
 
     Args:
       conn: a DBConn instance
-      D: Parquet file prefix for which the column should be set
-      delaysColName: column name: IsInVPDelays or IsInHlyDelays
+      D: Parquet file date for which the column should be set
+      delaysColName: column name - IsInVPDelays or IsInHlyDelays
     """
 
     sqlStmt = """
