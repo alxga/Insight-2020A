@@ -182,7 +182,7 @@ class VehPos:
       objKey: Protobuf S3 key
     """
 
-    def _vehpos_pb2_to_dbtpl_dtutc(pbVal):
+    def vehpos_pb2_to_dbtpl_dtutc(pbVal):
       dt = datetime.utcfromtimestamp(pbVal.timestamp)
       return (
         pbVal.trip.route_id, dt, pbVal.vehicle.id, pbVal.trip.trip_id,
@@ -194,9 +194,7 @@ class VehPos:
     s3Mgr = s3.S3Mgr()
     data = s3Mgr.fetch_object_body(objKey)
     gtfsrt.process_entities(data,
-        eachVehiclePos=lambda x: ret.append(
-            VehPos._vehpos_pb2_to_dbtpl_dtutc(x)
-        )
+        eachVehiclePos=lambda x: ret.append(vehpos_pb2_to_dbtpl_dtutc(x))
     )
     return ret
 
@@ -213,7 +211,7 @@ class VehPos:
       objKey: Protobuf S3 key
     """
 
-    def _vehpos_pb2_to_dbtpl_dtlocal(pbVal):
+    def vehpos_pb2_to_dbtpl_dtlocal(pbVal):
       dt = datetime.fromtimestamp(pbVal.timestamp)
       return (
         pbVal.trip.route_id, dt, pbVal.vehicle.id, pbVal.trip.trip_id,
@@ -225,9 +223,7 @@ class VehPos:
     s3Mgr = s3.S3Mgr()
     data = s3Mgr.fetch_object_body(objKey)
     gtfsrt.process_entities(data,
-        eachVehiclePos=lambda x: ret.append(
-            VehPos._vehpos_pb2_to_dbtpl_dtlocal(x)
-        )
+        eachVehiclePos=lambda x: ret.append(vehpos_pb2_to_dbtpl_dtlocal(x))
     )
     return ret
 
