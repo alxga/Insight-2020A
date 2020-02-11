@@ -4,7 +4,7 @@ The application collects General Transit Feed Specification (GTFS) Real-Time (RT
 
 ## Table of Contents
 1. [Deployment Instructions](README.md#deployment-instructions)
-1. [Packages and Files](README.md#packages-and-files)
+1. [Directory Structure](README.md#directory-structure)
 1. [License](README.md#license)
 1. [Contact Information](README.md#contact-information)
 
@@ -32,12 +32,12 @@ The application collects General Transit Feed Specification (GTFS) Real-Time (RT
 * Configure a Flask webserver on an additional Amazon Web Services EC2 instance
   * Make sure that the following environment variables are set on the webserver machine: MYSQL_HOST, MYSQL_USER, MYSQL_PWD, MYSQL_DBNAME, AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY, AWS_DEFAULT_REGION
 
-## Packages and Files
+## Directory Structure
 
 The tool is implemented as a set of scripts for Python 3. Frontend, in addition, contains some HTML, CSS, and Javascript files. The folder structure is as follows
 
 ### Root Directory
-File or Package | Role
+Name | Role
 ---- | ----
 **.vscode/** | Visual Studio Code project configuration files
 **airdags/** | Airflow task definition graphs
@@ -51,15 +51,15 @@ File or Package | Role
 **frontend_app.py** | Flask application start-up script
 **myspark.sh** | Helper Bash script to launch Spark jobs
 
-### Subfolder **airdags/**
-File or Package | Role
+### **airdags/**
+Name | Role
 ---- | ----
 **air_download_mbta_gtfs.py** | Airflow DAG to download MBTA schedule if it's updated
 **air_download_mbta_gtfsrt.py** | Airflow DAG to collect the vehicle position feed
 **air_process_mbta_hourly.py** | Airflow DAG to update the database and Parquet files
 
-### Subfolder **airtasks/**
-File or Package | Role
+### **airtasks/**
+Name | Role
 ---- | ----
 **\_\_init__.py** | Converts this folder to a Python package to simplify imports
 **download_mbta_gtfs.py** | Downloads MBTA schedule if it's updated
@@ -69,8 +69,8 @@ File or Package | Role
 **spk_updatevehpos.py** | Updates the database table containing all of the vehicle positions
 **spk_writeparquets.py** | Saves Parquet files from Protocol Buffer files in S3
 
-### Subfolder **common/**
-File or Package | Role
+### **common/**
+Name | Role
 ---- | ----
 **\_\_init__.py** | Converts this folder to a Python package to simplify imports
 **appex.py** | Application-defined exceptions
@@ -82,9 +82,9 @@ File or Package | Role
 **settings.py** | Application configuration
 **utils.py** | Generic helper functions
 
-### Subfolder **frontend/**
+### **frontend/**
 
-File or Package | Role
+Name | Role
 ---- | ----
 **api** | Flask blueprints for AJAX calls
 **mbta** | Flask blueprints for HTML pages
@@ -93,9 +93,9 @@ File or Package | Role
 **\_\_init__.py** | Converts this folder to a Python package to simplify imports
 **math.py** | Functions to smoothen data before returning to client
 
-### Subfolder **third_party/**
+### **third_party/**
 
-Package or File | Role
+Name | Role
 ---- | ----
 **gtfsscheduleviewer/** | Scripts to display a Marey graph in **schedule_viewer.py**
 **transitfeed/** | Library to parse and validate static GTFS feeds
