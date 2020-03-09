@@ -97,8 +97,9 @@ function FCPlot(divSelector) {
       yScale = fc.scaleDiscontinuous(d3.scaleTime())
         .discontinuityProvider(_this.skipWeekdaysDiscontinuityProvider());
       xTickFilter = d3.timeDay.filter((d) => (
+        d.getDay() === 6));
+      gridXFilter = d3.timeDay.filter((d) => (
         d.getDay() === 0 || d.getDay() === 6));
-      gridXFilter = xTickFilter;
     }
 
     var gridlines = fc.annotationSvgGridline().xTicks(gridXFilter);
@@ -143,6 +144,7 @@ function FCPlot(divSelector) {
       .xDomain(_this.xLims)
       .yDomain(_this.yLims)
       .xTicks(xTickFilter)
+      .xTickFormat(d3.timeFormat('%b-%d'))
       /*.xDecorate(function(selection) {
         selection.select('text')
           .style('text-anchor', 'start')
