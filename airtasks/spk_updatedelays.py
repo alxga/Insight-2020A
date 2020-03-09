@@ -9,6 +9,7 @@ from datetime import datetime, timedelta
 from collections import namedtuple
 
 import pytz
+import tzlocal
 from pyspark.sql import functions as F
 from pyspark.sql import SparkSession
 from pyspark.sql.types import StructType, StructField
@@ -441,7 +442,7 @@ def read_vp_parquet(spark, targetDate):
     cutoffDate = datetime(targetDate.year, targetDate.month, targetDate.day,
                           8 - dst_diff) + timedelta(days=1)
     cutoffDate = pytz.utc.localize(cutoffDate) \
-      .astimezone(Settings.MBTA_TZ) \
+      .astimezone(tzlocal.get_localzone()) \
       .replace(tzinfo=None)
     udf_filter_for_pqdate = F.udf(
       lambda dt: dt < cutoffDate,
