@@ -1,6 +1,8 @@
 """Generic helper functions"""
 
 from datetime import datetime, timedelta
+import pytz
+from .settings import Settings
 
 __author__ = "Alex Ganin"
 
@@ -84,3 +86,11 @@ def sched_time_to_dt(timeStr, targetDate):
         hour=h, minute=int(tkns[1]), second=int(tkns[2])
     ) + delta
   return dt
+
+def dst_diff(targetDate):
+  # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
+  dt = datetime(targetDate.year, targetDate.month, targetDate.day, 8)
+  dt1 = dt + timedelta(days=1)
+  dt = pytz.utc.localize(dt).astimezone(Settings.MBTA_TZ)
+  dt1 = pytz.utc.localize(dt1).astimezone(Settings.MBTA_TZ)
+  return dt1.hour - dt.hour

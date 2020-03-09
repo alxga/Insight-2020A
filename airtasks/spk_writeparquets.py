@@ -23,6 +23,7 @@ def fetch_parquet_dts():
   pfxDT = datetime(2020, 1, 1)
   utcNow = datetime.utcnow()
   dts = []
+  # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
   while pfxDT + timedelta(days=1, hours=8, minutes=10) < utcNow:
     dts.append(pfxDT)
     pfxDT += timedelta(days=1)
@@ -97,7 +98,7 @@ def run(spark):
       numRecs = 0
 
     with DBConn() as conn:
-      dbtables.PqDates.invert_values(conn, targetDate, len(keys), numRecs)
+      dbtables.PqDates.insert_values(conn, targetDate, len(keys), numRecs)
       conn.commit()
 
 

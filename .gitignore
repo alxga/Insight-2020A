@@ -19,3 +19,4 @@ venv*/
 *.zip
 *.pyc
 gtfs_realtime_pb2.py
+spk_temp.py

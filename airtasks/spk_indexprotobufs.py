@@ -83,7 +83,7 @@ def run(spark):
     tpl = (pfx, len(keys))
 
     with DBConn() as conn:
-      dbtables.S3Prefixes.invert_values(conn, pfx, len(keys))
+      dbtables.S3Prefixes.insert_values(conn, pfx, len(keys))
       conn.commit()
     print("PUSHED S3Prefix %s" % str(tpl))
 

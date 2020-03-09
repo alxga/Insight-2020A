@@ -41,7 +41,7 @@ function FCPlot(divSelector) {
 
     var daysDiff = mxDt.diff(mnDt, 'days')
     if (daysDiff > 50) {
-      mnDt = mxDt.subtract(50, 'days');
+      mnDt = mxDt.clone().subtract(50, 'days');
     }
 
     mnDt = mnDt.set({'hour': 0, 'minute': 0, 'second': 0});

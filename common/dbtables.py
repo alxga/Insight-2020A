@@ -32,7 +32,7 @@ class S3Prefixes:
 
 
   @staticmethod
-  def invert_values(conn, prefix, numRecs):
+  def insert_values(conn, prefix, numRecs):
     """Inserts a record in the table
 
     Args:
@@ -137,8 +137,7 @@ class VehPosPb:
 
     sqlStmt = """
       SELECT S3Key FROM `VehPosPb`
-      WHERE NumRecs > 0 and IsInVehPos and
-            S3KeyDT > %s and S3KeyDT < %s;
+      WHERE NumRecs > 0 and S3KeyDT > %s and S3KeyDT < %s;
       """
     cur = conn.execute(sqlStmt, (dt1, dt2))
     ret = []
@@ -349,7 +348,7 @@ class PqDates:
 
 
   @staticmethod
-  def invert_values(conn, name, numKeys, numRecs):
+  def insert_values(conn, name, numKeys, numRecs):
     """Inserts a record describing a newly created Parquet file into the table
 
     Args:

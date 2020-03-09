@@ -2,6 +2,7 @@
 
 import os
 import sys
+import pytz
 
 __author__ = "Alex Ganin"
 
@@ -30,6 +31,8 @@ class Settings:
     self.PyVersion = sys.version_info[0]
 
     self.S3BucketName = "alxga-insde"
+
+    self.MBTA_TZ = pytz.timezone("US/Eastern")
 
 
 Settings = Settings()

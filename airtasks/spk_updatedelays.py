@@ -97,18 +97,21 @@ class VPDelaysCalculator:
 
     stopTimeLst = []
     for stopTimeRec in stopTimeRecs:
+      try:
+        dt = utils.sched_time_to_dt(stopTimeRec[2], pqDate)
+        dt = Settings.MBTA_TZ.localize(dt).astimezone(pytz.UTC)
+      except (pytz.exceptions.AmbiguousTimeError,
+              pytz.exceptions.NonExistentTimeError):
+        continue
       stopTimeLst.append(dict(
           tripId=stopTimeRec[0],
           stopId=stopTimeRec[1],
           stopSeq=stopTimeRec[3],
           stopName=stopTimeRec[4],
           routeId=stopTimeRec[8],
-          coords=shapelib.Point.FromLatLng(stopTimeRec[6], stopTimeRec[7])
+          coords=shapelib.Point.FromLatLng(stopTimeRec[6], stopTimeRec[7]),
+          schedDT=dt.replace(tzinfo=None)
       ))
-      dt = utils.sched_time_to_dt(stopTimeRec[2], pqDate)
-      dt = dt.replace(tzinfo=pytz.timezone("US/Eastern")) \
-        .astimezone(pytz.UTC)
-      stopTimeLst[-1]["schedDT"] = dt.replace(tzinfo=None)
 
     vehPosLst = []
     for vehPosRec in vehPosRecs:
@@ -140,7 +143,7 @@ class VPDelaysCalculator:
       # adjust the scheduled time for possible date mismatches
       schedDT = stopTime["schedDT"]
       daysDiff = round((schedDT - curClosest.DT).total_seconds() / (24 * 3600))
-      schedDT += timedelta(days=daysDiff)
+      schedDT -= timedelta(days=daysDiff)
 
       vpLatLon = curClosest.coords.ToLatLng()
       ret.append((
@@ -194,8 +197,7 @@ class HlyDelaysCalculator:
       dt: datetime to convert
     """
 
-    dt = dt.replace(tzinfo=pytz.UTC) \
-        .astimezone(pytz.timezone("US/Eastern"))
+    dt = pytz.utc.localize(dt).astimezone(Settings.MBTA_TZ)
     return (dt.date(), dt.hour)
 
 
@@ -249,7 +251,7 @@ class HlyDelaysCalculator:
 
   def group_routes(self, dfHlyDelays):
     """Additionally aggregates an hourly delays dataframe so that it has data
-    groupped by Date (US/Eastern time), Hour (US/Eastern time), and RouteId
+    grouped by Date (US/Eastern time), Hour (US/Eastern time), and RouteId
     """
 
     dfResult = dfHlyDelays \
@@ -267,7 +269,7 @@ class HlyDelaysCalculator:
 
   def group_stops(self, dfHlyDelays):
     """Additionally aggregates an hourly delays dataframe so that it has data
-    groupped by Date (US/Eastern time), Hour (US/Eastern time), and StopName
+    grouped by Date (US/Eastern time), Hour (US/Eastern time), and StopName
     """
 
     dfResult = dfHlyDelays \
@@ -289,7 +291,7 @@ class HlyDelaysCalculator:
 
   def group_all(self, dfHlyDelays):
     """Additionally aggregates an hourly delays dataframe so that it has data
-    groupped by Date (US/Eastern time) and Hour (US/Eastern time) only
+    grouped by Date (US/Eastern time) and Hour (US/Eastern time) only
     """
 
     dfResult = dfHlyDelays \
@@ -431,7 +433,22 @@ def read_vp_parquet(spark, targetDate):
 
   objUri = "VP-" + targetDate.strftime("%Y%m%d")
   objUri = "s3a://" + '/'.join((Settings.S3BucketName, "parquet", objUri))
-  return spark.read.parquet(objUri)
+  ret = spark.read.parquet(objUri)
+  dst_diff = utils.dst_diff(targetDate)
+  if dst_diff > 0: # Clock is moving forward today
+    # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
+    # remove any values between 3 am and 4 am of the next day
+    cutoffDate = datetime(targetDate.year, targetDate.month, targetDate.day,
+                          8 - dst_diff) + timedelta(days=1)
+    cutoffDate = pytz.utc.localize(cutoffDate) \
+      .astimezone(Settings.MBTA_TZ) \
+      .replace(tzinfo=None)
+    udf_filter_for_pqdate = F.udf(
+      lambda dt: dt < cutoffDate,
+      BooleanType()
+    )
+    ret = ret.filter(udf_filter_for_pqdate(ret.DT))
+  return ret
 
 
 def run(spark):
