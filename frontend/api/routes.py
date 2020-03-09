@@ -2,9 +2,9 @@ from io import StringIO
 from datetime import datetime
 from collections import namedtuple
 import csv
-import pytz
 from flask import jsonify, request, Response
 from common.queryutils import DBConn
+from common import Settings
 from .. import math
 from . import bp
 
@@ -83,15 +83,16 @@ def query_delays_hourly(routeId, stopName):
 
   data = []
 
-  if len(records) >= 2:
+  if len(records) > 2:
     x = [rec.AvgDelay for rec in records]
     w = [rec.Cnt for rec in records]
     xsmoothed = math.rolling_weighted_triangle_conv(x, w, 7)
 
-    for i, rec in enumerate(records):
+    for i in range(0, len(records) - 2):
+      rec = records[i]
       dt = datetime(rec.DateEST.year, rec.DateEST.month, rec.DateEST.day,
-                    rec.HourEST, 30, 0) \
-        .replace(tzinfo=pytz.timezone("EST"))
+                    rec.HourEST, 30, 0)
+      dt = Settings.MBTA_TZ.localize(dt)
       data.append({
         "dt": dt.strftime("%Y-%m-%d %H:%M:%S"),
         "value": xsmoothed[i],

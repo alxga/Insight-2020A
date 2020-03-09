@@ -15,7 +15,7 @@ function FCPlot(divSelector) {
 
   // Default axes limits
   _this.xLims = [new Date(2020, 0, 1), new Date(2020, 1, 1)]
-  _this.yLims = [-300, 1800]
+  _this.yLims = [-500, 1500]
 
   // Day of Week mode that was used to build the chart;
   // undefined if no chart has been built yet
@@ -40,8 +40,8 @@ function FCPlot(divSelector) {
     }
 
     var daysDiff = mxDt.diff(mnDt, 'days')
-    if (daysDiff > 50) {
-      mnDt = mxDt.clone().subtract(50, 'days');
+    if (daysDiff > 100) {
+      mnDt = mxDt.clone().subtract(100, 'days');
     }
 
     mnDt = mnDt.set({'hour': 0, 'minute': 0, 'second': 0});
@@ -125,7 +125,15 @@ function FCPlot(divSelector) {
       });
 
     const multi = fc.seriesSvgMulti()
-      .series([gridlines, seriesLine, seriesMarkers]);
+      .series([gridlines, seriesLine, seriesMarkers])
+      .mapping((data, index, series) => {
+        switch (series[index]) {
+          case seriesMarkers:
+            return data.filter(d => d.dt.getHours() == 0);
+          default:
+            return data;
+        }
+      });
     
     _this.chart = fc.chartCartesian(yScale, d3.scaleLinear())
       // .xAxisHeight('3.5em')
