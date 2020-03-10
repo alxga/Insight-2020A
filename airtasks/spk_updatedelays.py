@@ -23,6 +23,28 @@ from common.queryutils import DBConn, DBConnCommonQueries
 __author__ = "Alex Ganin"
 
 
+def _compute_date_cutoffs(targetDate, retTZ=pytz.utc):
+  # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
+  lowerCutoff = datetime(targetDate.year, targetDate.month, targetDate.day,
+                         8)
+  dst_diff = abs(utils.dst_diff(targetDate))
+  # If dst_diff is non-zero, the clock is moving backward or forward today
+  # remove any values between 3 am and 4 am of the next day if the clock is
+  # moving forward and between 2 am and 3 am if the clock is moving backward
+  upperCutoff = datetime(targetDate.year, targetDate.month, targetDate.day,
+                         8 - dst_diff) + timedelta(days=1)
+
+  if retTZ != pytz.utc:
+    lowerCutoff = pytz.utc.localize(lowerCutoff) \
+      .astimezone(retTZ) \
+      .replace(tzinfo=None)
+    upperCutoff = pytz.utc.localize(upperCutoff) \
+      .astimezone(retTZ) \
+      .replace(tzinfo=None)
+
+  return [lowerCutoff, upperCutoff]
+
+
 class VPDelaysCalculator:
   """Class to handle calculations and updates to the VPDelays table
   """
@@ -75,9 +97,10 @@ class VPDelaysCalculator:
       .groupByKey()
 
     pqDate = self.pqDate
+    cutoffs = _compute_date_cutoffs(pqDate, pytz.utc)
     rddVPDelays = rddStopTimes.join(rddVehPos) \
       .flatMap(lambda keyTpl1Tpl2:
-        VPDelaysCalculator._process_joined(pqDate, keyTpl1Tpl2))
+        VPDelaysCalculator._process_joined(pqDate, cutoffs, keyTpl1Tpl2))
 
     return self.spark.createDataFrame(rddVPDelays, self.TableSchema)
 
@@ -92,7 +115,7 @@ class VPDelaysCalculator:
 
 
   @staticmethod
-  def _process_joined(pqDate, keyTpl1Tpl2):
+  def _process_joined(pqDate, cutoffs, keyTpl1Tpl2):
     stopTimeRecs = keyTpl1Tpl2[1][0]
     vehPosRecs = keyTpl1Tpl2[1][1]
 
@@ -122,11 +145,11 @@ class VPDelaysCalculator:
           shapelib.Point.FromLatLng(vehPosRec[4], vehPosRec[5])
       ))
 
-    return VPDelaysCalculator._calc_delays(stopTimeLst, vehPosLst)
+    return VPDelaysCalculator._calc_delays(cutoffs, stopTimeLst, vehPosLst)
 
 
   @staticmethod
-  def _calc_delays(stopTimeLst, vehPosLst):
+  def _calc_delays(cutoffs, stopTimeLst, vehPosLst):
     ret = []
 
     for stopTime in stopTimeLst:
@@ -146,13 +169,14 @@ class VPDelaysCalculator:
       daysDiff = round((schedDT - curClosest.DT).total_seconds() / (24 * 3600))
       schedDT -= timedelta(days=daysDiff)
 
-      vpLatLon = curClosest.coords.ToLatLng()
-      ret.append((
-          stopTime["routeId"], stopTime["tripId"], stopTime["stopId"],
-          stopTime["stopName"], stopLatLon[0], stopLatLon[1], schedDT,
-          vpLatLon[0], vpLatLon[1], curClosest.DT, curDist,
-          (curClosest.DT - schedDT).total_seconds()
-      ))
+      if cutoffs[0] < schedDT < cutoffs[1]:
+        vpLatLon = curClosest.coords.ToLatLng()
+        ret.append((
+            stopTime["routeId"], stopTime["tripId"], stopTime["stopId"],
+            stopTime["stopName"], stopLatLon[0], stopLatLon[1], schedDT,
+            vpLatLon[0], vpLatLon[1], curClosest.DT, curDist,
+            (curClosest.DT - schedDT).total_seconds()
+        ))
     return ret
 
 
@@ -435,22 +459,10 @@ def read_vp_parquet(spark, targetDate):
   objUri = "VP-" + targetDate.strftime("%Y%m%d")
   objUri = "s3a://" + '/'.join((Settings.S3BucketName, "parquet", objUri))
   ret = spark.read.parquet(objUri)
-  # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
-  lowerCutoff = datetime(targetDate.year, targetDate.month, targetDate.day,
-                         8)
 
-  dst_diff = abs(utils.dst_diff(targetDate))
-  # If dst_diff is non-zero, the clock is moving backward or forward today
-  # remove any values between 3 am and 4 am of the next day if the clock is
-  # moving forward and between 2 am and 3 am if the clock is moving backward
-  upperCutoff = datetime(targetDate.year, targetDate.month, targetDate.day,
-                         8 - dst_diff) + timedelta(days=1)
-  upperCutoff = pytz.utc.localize(upperCutoff) \
-    .astimezone(tzlocal.get_localzone()) \
-    .replace(tzinfo=None)
-
+  cutoffs = _compute_date_cutoffs(targetDate, tzlocal.get_localzone())
   udf_filter_for_pqdate = F.udf(
-    lambda dt: lowerCutoff < dt < upperCutoff,
+    lambda dt: cutoffs[0] < dt < cutoffs[1],
     BooleanType()
   )
   ret = ret.filter(udf_filter_for_pqdate(ret.DT))
