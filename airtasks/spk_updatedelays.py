@@ -435,20 +435,25 @@ def read_vp_parquet(spark, targetDate):
   objUri = "VP-" + targetDate.strftime("%Y%m%d")
   objUri = "s3a://" + '/'.join((Settings.S3BucketName, "parquet", objUri))
   ret = spark.read.parquet(objUri)
-  dst_diff = utils.dst_diff(targetDate)
-  if dst_diff > 0: # Clock is moving forward today
-    # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
-    # remove any values between 3 am and 4 am of the next day
-    cutoffDate = datetime(targetDate.year, targetDate.month, targetDate.day,
-                          8 - dst_diff) + timedelta(days=1)
-    cutoffDate = pytz.utc.localize(cutoffDate) \
-      .astimezone(tzlocal.get_localzone()) \
-      .replace(tzinfo=None)
-    udf_filter_for_pqdate = F.udf(
-      lambda dt: dt < cutoffDate,
-      BooleanType()
-    )
-    ret = ret.filter(udf_filter_for_pqdate(ret.DT))
+  # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
+  lowerCutoff = datetime(targetDate.year, targetDate.month, targetDate.day,
+                         8)
+
+  dst_diff = abs(utils.dst_diff(targetDate))
+  # If dst_diff is non-zero, the clock is moving backward or forward today
+  # remove any values between 3 am and 4 am of the next day if the clock is
+  # moving forward and between 2 am and 3 am if the clock is moving backward
+  upperCutoff = datetime(targetDate.year, targetDate.month, targetDate.day,
+                         8 - dst_diff) + timedelta(days=1)
+  upperCutoff = pytz.utc.localize(upperCutoff) \
+    .astimezone(tzlocal.get_localzone()) \
+    .replace(tzinfo=None)
+
+  udf_filter_for_pqdate = F.udf(
+    lambda dt: lowerCutoff < dt < upperCutoff,
+    BooleanType()
+  )
+  ret = ret.filter(udf_filter_for_pqdate(ret.DT))
   return ret
 
 

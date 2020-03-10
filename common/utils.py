@@ -87,9 +87,21 @@ def sched_time_to_dt(timeStr, targetDate):
     ) + delta
   return dt
 
+
 def dst_diff(targetDate):
-  # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
-  dt = datetime(targetDate.year, targetDate.month, targetDate.day, 8)
+  """Checks whether DST starts or ends on the next day in the MBTA time zone
+
+  Uses Settings.MBTA_TZ
+
+  Args:
+    targetDate: date to check
+
+  Returns:
+    +1 if the clock will move forward on the night from targetDate to
+    (targetDate + 1 day), -1 if the clock will move backward, 0 otherwise
+  """
+
+  dt = datetime(targetDate.year, targetDate.month, targetDate.day, 12)
   dt1 = dt + timedelta(days=1)
   dt = pytz.utc.localize(dt).astimezone(Settings.MBTA_TZ)
   dt1 = pytz.utc.localize(dt1).astimezone(Settings.MBTA_TZ)
