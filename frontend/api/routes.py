@@ -88,7 +88,7 @@ def query_delays_hourly(routeId, stopName):
     w = [rec.Cnt for rec in records]
     xsmoothed = math.rolling_weighted_triangle_conv(x, w, 7)
 
-    for i in range(0, len(records) - 2):
+    for i, rec in enumerate(records):
       rec = records[i]
       dt = datetime(rec.DateEST.year, rec.DateEST.month, rec.DateEST.day,
                     rec.HourEST, 30, 0)
