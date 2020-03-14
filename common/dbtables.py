@@ -308,17 +308,21 @@ class PqDates:
 
 
   @staticmethod
-  def select_pqdates_not_in_delays(conn):
+  def select_pqdates_not_in_delays(conn, withVPDelays):
     """Retrieves a list of Parquet files for which delays need to be calculated
 
     Args:
       conn: a DBConn instance
+      withVPDelays: whether to return dates not in the VPDelays table (dates
+    not in the HlyDelays table are always returned)
     """
 
+    whFlags = "(not IsInVPDelays or not IsInHlyDelays)" if withVPDelays \
+      else "not IsInHlyDelays"
     sqlStmt = """
       SELECT D, IsInVPDelays, IsInHlyDelays FROM `PqDates`
-      WHERE NumRecs > 0 and (not IsInVPDelays or not IsInHlyDelays);
-    """
+      WHERE NumRecs > 0 and %s;
+    """ % whFlags
     ret = []
     cur = conn.execute(sqlStmt)
     for row in cur:

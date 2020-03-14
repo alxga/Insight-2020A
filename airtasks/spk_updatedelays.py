@@ -490,7 +490,8 @@ def run(spark):
 
   gtfsFetcher = GTFSFetcher(spark)
   with DBConn() as conn:
-    entriesToProcess = dbtables.PqDates.select_pqdates_not_in_delays(conn)
+    entriesToProcess = \
+      dbtables.PqDates.select_pqdates_not_in_delays(conn, InsertVPDelays)
   for entry in entriesToProcess:
     targetDate = entry["Date"]
 
