@@ -9,6 +9,7 @@ __author__ = "Alex Ganin"
 
 
 BashCmdPrefix = "cd ~/src && "
+InsertVehPos = False
 
 
 default_args = {
@@ -34,13 +35,16 @@ update_vehpos_pb = BashOperator(
     queue="sparks",
     dag=dag
 )
-update_vehpos = BashOperator(
-    task_id="update_vehpos",
-    bash_command=(BashCmdPrefix +
-      "./myspark.sh airtasks/spk_updatevehpos.py --on-master"),
-    queue="sparks",
-    dag=dag
-)
+
+if InsertVehPos:
+  update_vehpos = BashOperator(
+      task_id="update_vehpos",
+      bash_command=(BashCmdPrefix +
+        "./myspark.sh airtasks/spk_updatevehpos.py --on-master"),
+      queue="sparks",
+      dag=dag
+  )
+
 update_vehpos_pq = BashOperator(
     task_id="write_parquets",
     bash_command=(BashCmdPrefix +
@@ -48,7 +52,8 @@ update_vehpos_pq = BashOperator(
     queue="sparks",
     dag=dag
 )
-calc_vp_delays = BashOperator(
+
+update_delays = BashOperator(
     task_id="update_delays",
     bash_command=(BashCmdPrefix +
       "./myspark.sh airtasks/spk_updatedelays.py --on-master"),
@@ -56,6 +61,10 @@ calc_vp_delays = BashOperator(
     dag=dag
 )
 
-update_vehpos.set_upstream(update_vehpos_pb)
-update_vehpos_pq.set_upstream(update_vehpos)
-calc_vp_delays.set_upstream(update_vehpos_pq)
+if InsertVehPos:
+  update_vehpos.set_upstream(update_vehpos_pb)
+  update_vehpos_pq.set_upstream(update_vehpos)
+  update_delays.set_upstream(update_vehpos_pq)
+else:
+  update_vehpos_pq.set_upstream(update_vehpos_pb)
+  update_delays.set_upstream(update_vehpos_pq)

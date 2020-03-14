@@ -22,6 +22,8 @@ from common.queryutils import DBConn, DBConnCommonQueries
 
 __author__ = "Alex Ganin"
 
+InsertVPDelays = False
+
 
 def _compute_date_cutoffs(targetDate, retTZ=pytz.utc):
   # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
@@ -513,7 +515,7 @@ def run(spark):
         VPDelaysCalculator(spark, targetDate, dfStopTimes, dfVehPos)
       dfVPDelays = calcVPDelays.create_result_df()
 
-      if not entry["IsInVPDelays"]:
+      if InsertVPDelays and not entry["IsInVPDelays"]:
         with DBConn() as conn:
           dbtables.VPDelays.delete_for_parquet(conn, targetDate)
           conn.commit()
