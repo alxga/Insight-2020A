@@ -85,7 +85,8 @@ def run(spark):
         StructField("StopSeq", IntegerType(), True),
         StructField("StopId", StringType(), True),
       ])
-      dfVP = spark.createDataFrame(rddVP, schema)
+      dfVP = spark.createDataFrame(rddVP, schema) \
+        .repartition(100)
       print("Created dataframe for %d keys of %s" % (len(keys), str(targetDate)), flush=True)
 
       pqKey = targetDate.strftime("%Y%m%d")
