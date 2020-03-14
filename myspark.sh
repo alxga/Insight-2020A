@@ -38,5 +38,6 @@ if [ "$onMaster" = "true" ] ; then
   args="${args} --master spark://${SPARKM}:7077"
 fi
 echo $args
+PYSPARK_DRIVER_PYTHON="$HOME/venv/bin/python"
 spark-submit $args $extraArgs "$LAUNCH_PYSCRIPT"
 
