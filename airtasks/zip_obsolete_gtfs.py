@@ -34,7 +34,7 @@ def archive_gtfs_files(s3Mgr, feedDesc):
     tarInfo.size = len(data)
     tbz2.addfile(tarinfo=tarInfo, fileobj=BytesIO(data))
   tbz2.close()
-  objKey = '/'.join(["GTFS", feedDesc.s3Key]) + ".tar.bz2"
+  objKey = '/'.join(["GTFS_Archived", feedDesc.s3Key]) + ".tar.bz2"
   s3Mgr.put_object_body(objKey, buffer.getvalue())
 
   for objKey in objKeys:
@@ -42,7 +42,10 @@ def archive_gtfs_files(s3Mgr, feedDesc):
 
 
 def main():
-  """Downloads, compresses, and uploads obsolete MBTA GTFS feeds
+  """Compresses text files from obsolete feeds in S3, uploads archives to S3,
+  and removes the text files
+
+  Uses tar.bz2 format
   """
   s3Mgr = s3.S3Mgr()
   objKey = '/'.join(["GTFS", "MBTA_archived_feeds.txt"])
