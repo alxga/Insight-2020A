@@ -61,7 +61,8 @@ def upload_zips(feedDescs):
   s3Mgr = s3.S3Mgr()
   for feedDesc in feedDescs:
     s3Key = '/'.join(["GTFS", feedDesc.s3Key])
-    if not s3Mgr.prefix_exists(s3Key):
+    archS3Key = '/'.join(["GTFS_Archived", feedDesc.s3Key])
+    if not s3Mgr.prefix_exists(s3Key) and not s3Mgr.prefix_exists(archS3Key):
       upload_zip(s3Mgr, feedDesc, s3Key)
 
 
