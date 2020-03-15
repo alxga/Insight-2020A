@@ -333,6 +333,29 @@ class PqDates:
       })
     return ret
 
+  @staticmethod
+  def select_latest_processed(conn, withVPDelays):
+    """Returns the latest date for which delays were calculated from Parquet
+
+    Args:
+      conn: a DBConn instance
+      withVPDelays: whether to filter out the dates for which IsInVPDelays is
+    not True
+    """
+
+    whFlags = "IsInVPDelays and IsInHlyDelays" if withVPDelays \
+      else "IsInHlyDelays"
+    sqlStmt = """
+      SELECT max(D) FROM `PqDates`
+      WHERE NumRecs > 0 and %s;
+    """ % whFlags
+    cur = conn.execute(sqlStmt)
+    try:
+      row = next(cur)
+      return row[0]
+    except StopIteration:
+      return None
+
 
   @staticmethod
   def update_in_delays(conn, D, delaysColName):

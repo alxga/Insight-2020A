@@ -24,6 +24,16 @@ class S3Mgr:
     self.bucketName = bucketName
 
 
+  def delete_key(self, objKey):
+    """Deletes an object from storage
+
+    Args:
+      objKey: key to remove
+    """
+
+    self._Res.Object(self.bucketName, objKey).delete()
+
+
   def move_key(self, objKey, nObjKey):
     """Renames/Moves a key
 

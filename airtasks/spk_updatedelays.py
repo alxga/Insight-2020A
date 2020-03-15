@@ -22,8 +22,6 @@ from common.queryutils import DBConn, DBConnCommonQueries
 
 __author__ = "Alex Ganin"
 
-InsertVPDelays = False
-
 
 def _compute_date_cutoffs(targetDate, retTZ=pytz.utc):
   # we define new day to start at 8:00 UTC (3 or 4 at night Boston time)
@@ -412,7 +410,7 @@ class GTFSFetcher:
     return dfStopTimes.filter("time is not NULL")
 
 
-  def readStopTimes(self, feedDesc):
+  def read_stop_times(self, feedDesc):
     """Reads a GTFS feed and returns a stop times dataframe
 
     Args:
@@ -440,7 +438,7 @@ class GTFSFetcher:
 
 
   @staticmethod
-  def readFeedDescs():
+  def read_feed_descs():
     """Retrieves a list of GTFS feed descriptions available on S3
     """
 
@@ -483,15 +481,15 @@ def run(spark):
     dbtables.create_if_not_exists(conn, dbtables.VPDelays)
     dbtables.create_if_not_exists(conn, dbtables.HlyDelays)
 
-  feedDescs = GTFSFetcher.readFeedDescs()
+  feedDescs = GTFSFetcher.read_feed_descs()
   curFeedDesc = None
   dfStopTimes = None
   feedRequiredFiles = ["stops.txt", "stop_times.txt", "trips.txt"]
 
   gtfsFetcher = GTFSFetcher(spark)
   with DBConn() as conn:
-    entriesToProcess = \
-      dbtables.PqDates.select_pqdates_not_in_delays(conn, InsertVPDelays)
+    entriesToProcess = dbtables.PqDates \
+      .select_pqdates_not_in_delays(conn, Settings.InsertVPDelays)
   for entry in entriesToProcess:
     targetDate = entry["Date"]
 
@@ -501,7 +499,7 @@ def run(spark):
       for fd in feedDescs:
         if fd.includes_date(targetDate) and fd.includes_files(feedRequiredFiles):
           curFeedDesc = fd
-          dfStopTimes = gtfsFetcher.readStopTimes(curFeedDesc)
+          dfStopTimes = gtfsFetcher.read_stop_times(curFeedDesc)
           print('USING FEED "%s" for %s' % \
                 (curFeedDesc.version, targetDate.strftime("%Y-%m-%d")))
           break
@@ -516,7 +514,7 @@ def run(spark):
         VPDelaysCalculator(spark, targetDate, dfStopTimes, dfVehPos)
       dfVPDelays = calcVPDelays.create_result_df()
 
-      if InsertVPDelays and not entry["IsInVPDelays"]:
+      if Settings.InsertVPDelays and not entry["IsInVPDelays"]:
         with DBConn() as conn:
           dbtables.VPDelays.delete_for_parquet(conn, targetDate)
           conn.commit()
