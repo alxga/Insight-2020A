@@ -2,6 +2,7 @@
 
 import os
 import sys
+import logging
 import pytz
 
 __author__ = "Alex Ganin"
@@ -22,6 +23,8 @@ class Settings:
     GTFS_ObsoleteAfterDays: number of days between the latest delays
       calculation and the last day of a GTFS feed coverage for the feed to
       be considered obsolete and to be stored compressed in S3
+    NumPartitions: used in Spark tasks to partition dataframe
+    ConsoleLogger: A logger writing to console
   """
 
   def __init__(self):
@@ -42,6 +45,14 @@ class Settings:
     self.MBTA_TZ = pytz.timezone("US/Eastern")
 
     self.GTFS_ObsoleteAfterDays = 10
+
+    self.NumPartitions = 100
+
+    self.ConsoleLogger = logging.getLogger("console")
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    self.ConsoleLogger.addHandler(handler)
+    self.ConsoleLogger.setLevel(logging.INFO)
 
 
 Settings = Settings()

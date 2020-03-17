@@ -9,7 +9,7 @@ from pyspark.sql.types import StructType, StructField
 from pyspark.sql.types \
   import StringType, TimestampType, DoubleType, IntegerType
 
-from common import credentials, dbtables
+from common import Settings, credentials, dbtables, utils
 from common.queryutils import DBConn, DBConnCommonQueries
 
 __author__ = "Alex Ganin"
@@ -59,17 +59,24 @@ def run(spark):
     spark: Spark Session object
   """
 
+  log = utils.get_logger()
+
   with DBConnCommonQueries() as conn:
     dbtables.create_if_not_exists(conn, dbtables.PqDates)
 
   targetDates = fetch_parquet_dts()
   for targetDate in targetDates:
     keys = fetch_keys_for_date(targetDate)
-    print("Got %d keys of %s" % (len(keys), str(targetDate)), flush=True)
+    log.info("Got %d keys of %s", len(keys), str(targetDate))
 
     if len(keys) > 0:
-      rddVP = spark.sparkContext \
+      rddKeys = spark.sparkContext \
         .parallelize(keys) \
+        .map(lambda x: (x, x)) \
+        .partitionBy(Settings.NumPartitions) \
+        .map(lambda x: x[0])
+
+      rddVP = rddKeys \
         .flatMap(dbtables.VehPos.build_df_tuples_from_pb) \
         .map(lambda tpl: ((tpl[1], tpl[3]), tpl)) \
         .reduceByKey(lambda x, y: x).map(lambda x: x[1])
@@ -85,15 +92,14 @@ def run(spark):
         StructField("StopSeq", IntegerType(), True),
         StructField("StopId", StringType(), True),
       ])
-      dfVP = spark.createDataFrame(rddVP, schema) \
-        .repartition(100)
-      print("Created dataframe for %d keys of %s" % (len(keys), str(targetDate)), flush=True)
+      dfVP = spark.createDataFrame(rddVP, schema)
+      log.info("Created dataframe for %d keys of %s", len(keys), str(targetDate))
 
       pqKey = targetDate.strftime("%Y%m%d")
       pqKey = '/'.join(["parquet", "VP-" + pqKey])
       pqKey = "s3a://alxga-insde/%s" % pqKey
       dfVP.write.format("parquet").mode("overwrite").save(pqKey)
-      print("Written to Parquet %d keys of %s" % (len(keys), str(targetDate)), flush=True)
+      log.info("Written to Parquet %d keys of %s", len(keys), str(targetDate))
       numRecs = dfVP.count()
     else:
       numRecs = 0

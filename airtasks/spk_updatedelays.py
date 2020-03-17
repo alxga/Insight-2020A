@@ -16,8 +16,8 @@ from pyspark.sql.types import StructType, StructField
 from pyspark.sql.types import StringType, DoubleType, IntegerType, \
   DateType, TimestampType, BooleanType
 from third_party.transitfeed import shapelib
-from common import credentials
-from common import Settings, s3, utils, gtfs, dbtables
+from common import Settings
+from common import credentials, dbtables, gtfs, s3, utils
 from common.queryutils import DBConn, DBConnCommonQueries
 
 __author__ = "Alex Ganin"
@@ -477,6 +477,8 @@ def run(spark):
     spark: Spark Session object
   """
 
+  log = utils.get_logger()
+
   with DBConnCommonQueries() as conn:
     dbtables.create_if_not_exists(conn, dbtables.VPDelays)
     dbtables.create_if_not_exists(conn, dbtables.HlyDelays)
@@ -500,12 +502,12 @@ def run(spark):
         if fd.includes_date(targetDate) and fd.includes_files(feedRequiredFiles):
           curFeedDesc = fd
           dfStopTimes = gtfsFetcher.read_stop_times(curFeedDesc)
-          print('USING FEED "%s" for %s' % \
-                (curFeedDesc.version, targetDate.strftime("%Y-%m-%d")))
+          log.info('USING FEED "%s" for %s', curFeedDesc.version,
+                   targetDate.strftime("%Y-%m-%d"))
           break
     else:
-      print('RE-USING FEED "%s" for %s' % \
-            (curFeedDesc.version, targetDate.strftime("%Y-%m-%d")))
+      log.info('RE-USING FEED "%s" for %s', curFeedDesc.version,
+               targetDate.strftime("%Y-%m-%d"))
 
     if dfStopTimes:
       dfVehPos = read_vp_parquet(spark, targetDate)

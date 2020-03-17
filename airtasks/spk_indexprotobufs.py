@@ -7,8 +7,7 @@ from datetime import datetime, timedelta
 
 from pyspark.sql import SparkSession
 
-from common import credentials
-from common import s3, dbtables
+from common import credentials, dbtables, s3, utils
 from common.queryutils import DBConn, DBConnCommonQueries
 
 __author__ = "Alex Ganin"
@@ -64,6 +63,8 @@ def run(spark):
     spark: Spark Session object
   """
 
+  log = utils.get_logger()
+
   with DBConnCommonQueries() as conn:
     dbtables.create_if_not_exists(conn, dbtables.S3Prefixes)
     dbtables.create_if_not_exists(conn, dbtables.VehPosPb)
@@ -74,18 +75,18 @@ def run(spark):
     fullPfx = '/'.join(("pb", "VehiclePos", pfx))
     keys = s3Mgr.fetch_keys(fullPfx)
     if len(keys) > 0:
-      print("PROCESSING %d KEYS FOR %s" % (len(keys), pfx))
+      log.info("PROCESSING %d KEYS FOR %s", len(keys), pfx)
       file_list = spark.sparkContext.parallelize(keys)
       file_list \
         .map(dbtables.VehPosPb.build_tuple_from_protobuf) \
         .foreachPartition(push_vehpospb_dbtpls)
-      print("PROCESSED %d KEYS FOR %s" % (len(keys), pfx))
+      log.info("PROCESSED %d KEYS FOR %s", len(keys), pfx)
     tpl = (pfx, len(keys))
 
     with DBConn() as conn:
       dbtables.S3Prefixes.insert_values(conn, pfx, len(keys))
       conn.commit()
-    print("PUSHED S3Prefix %s" % str(tpl))
+    log.info("PUSHED S3Prefix %s", str(tpl))
 
 
 if __name__ == "__main__":

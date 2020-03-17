@@ -1,5 +1,6 @@
 """Generic helper functions"""
 
+import logging
 from datetime import datetime, timedelta
 import pytz
 from .settings import Settings
@@ -106,3 +107,13 @@ def dst_diff(targetDate):
   dt = pytz.utc.localize(dt).astimezone(Settings.MBTA_TZ)
   dt1 = pytz.utc.localize(dt1).astimezone(Settings.MBTA_TZ)
   return dt1.hour - dt.hour
+
+def get_logger():
+  """Returns Airflow logger if it exists, otherwise returns a console logger
+  """
+
+  airLog = logging.getLogger("airflow.task")
+  if airLog.hasHandlers():
+    return airLog
+  else:
+    return Settings.ConsoleLogger

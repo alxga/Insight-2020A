@@ -5,7 +5,7 @@ import os
 
 from pyspark.sql import SparkSession
 
-from common import credentials, dbtables
+from common import credentials, dbtables, utils
 from common.queryutils import DBConn, DBConnCommonQueries
 
 __author__ = "Alex Ganin"
@@ -54,12 +54,14 @@ def run(spark):
     spark: Spark Session object
   """
 
+  log = utils.get_logger()
+
   with DBConnCommonQueries() as conn:
     dbtables.create_if_not_exists(conn, dbtables.VehPos)
 
   with DBConn() as conn:
     keys = dbtables.VehPosPb.select_protobuf_keys_not_invehpos(conn)
-  print("Got %d keys" % len(keys), flush=True)
+  log.info("Got %d keys", len(keys))
 
   step = 1000
   for i in range(0, len(keys), step):
@@ -73,14 +75,12 @@ def run(spark):
       .reduceByKey(lambda x, y: x)
 
     records.foreachPartition(push_vehpos_db)
-    print("Inserted records for keys  %d-%d" %
-          (lower, upper - 1), flush=True)
+    log.info("Inserted records for keys  %d-%d", lower, upper - 1)
 
     spark.sparkContext \
       .parallelize(keysSubrange) \
       .foreachPartition(set_vehpospb_invehpos)
-    print("Updated IsInVehPos for keys %d-%d" %
-          (lower, upper - 1), flush=True)
+    log.info("Updated IsInVehPos for keys %d-%d", lower, upper - 1)
 
 
 if __name__ == "__main__":

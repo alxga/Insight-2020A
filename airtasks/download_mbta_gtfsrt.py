@@ -4,14 +4,13 @@ during 1 minute
 
 import os
 import time
-import logging
 import threading
 from datetime import datetime
 import traceback
 
 import requests
 
-from common import Settings, s3
+from common import Settings, s3, utils
 
 __author__ = "Alex Ganin"
 
@@ -40,10 +39,9 @@ def download_feed(dirName, url, *args):
     os.remove(fPath)
 
   except Exception: # pylint: disable=broad-except
-    AirLog = logging.getLogger("airflow.task")
-    if AirLog:
-      AirLog.warn("Error while saving the file %s to S3 and/or DB" % fPath)
-      AirLog.warn(traceback.format_exc())
+    log = utils.get_logger()
+    log.warning("Error while saving the file %s to S3 and/or DB", fPath)
+    log.warning(traceback.format_exc())
     pass # do not interfere with other threads that might succeed
 
 
