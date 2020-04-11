@@ -3,7 +3,12 @@
 
 {%- block metas %}
 {{ super() }}
-<meta property='og:image' content="{{ url_for('static', filename='img/metaimage.png') }}"/>
+
+<meta property='og:title' content="{{ appName }}" />
+<meta property='og:image' content="{{ url_for('static', filename='img/metaimage.png') }}" />
+<meta property='og:description' content="{{ appDesc }}" />
+<meta property='og:url' content="{{ url_for('mbta.index') }}" />
+
 {%- endblock metas %}
 
 {% block styles %}

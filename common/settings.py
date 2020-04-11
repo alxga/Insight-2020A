@@ -31,6 +31,7 @@ class Settings:
     """Initializes the instance"""
 
     self.AppName = "my best transit app"
+    self.AppDesc = "The application collects General Transit Feed Specification (GTFS) Real-Time (RT) vehicle positions feeds (every 5 seconds) and GTFS schedule tables (once a day and only if there is an update)"
     self.FooterLine = "Alex Ganin, Insight Data Engineering, Boston MA, Winter 2020"
 
     self.PyPath = os.path.abspath(os.path.dirname(__file__))

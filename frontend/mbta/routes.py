@@ -11,7 +11,8 @@ __author__ = "Alex Ganin"
 @bp.route('/index', methods=['GET'])
 def index():
   return render_template(
-    'index.html', appName=Settings.AppName, footerLine=Settings.FooterLine
+    'index.html', appName=Settings.AppName, footerLine=Settings.FooterLine,
+    appDesc=Settings.AppDesc
   )
 
 
