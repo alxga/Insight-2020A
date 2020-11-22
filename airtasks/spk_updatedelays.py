@@ -341,6 +341,11 @@ class HlyDelaysCalculator:
         HlyDelaysCalculator._push_hlydelays_dbtpls(rows, pqDate, noRouteVal)
     )
 
+  def update_json(self, dfHlyDelays, pqDate, noRouteVal=None):
+    obj_key = pqDate.strftime("%Y%m%d.json")
+    s3_path = "s3a://%s/%s" % (Settings.S3BucketName, obj_key)
+    dfHlyDelays.write.json(s3_path)
+
 
   @staticmethod
   def _push_hlydelays_dbtpls(rows, pqDate, noRouteVal):
@@ -541,6 +546,9 @@ def run(spark):
         with DBConn() as conn:
           dbtables.HlyDelays.delete_for_parquet(conn, targetDate)
           conn.commit()
+        calcHlyDelays.update_json(dfHlyDelays, pqDate)
+        return
+
         calcHlyDelays.update_db(dfHlyDelays, targetDate)
         calcHlyDelays.update_db(dfGrpRoutes, targetDate)
         calcHlyDelays.update_db(dfGrpStops, targetDate)
