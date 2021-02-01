@@ -19,6 +19,12 @@ S3ConnArgs = {
   "region_name": os.environ["AWS_DEFAULT_REGION"]
 }
 
+DynDBConnArgs = {
+  "aws_access_key_id": os.environ["AWS_ACCESS_KEY_ID"],
+  "aws_secret_access_key": os.environ["AWS_SECRET_ACCESS_KEY"],
+  "region_name": os.environ["AWS_DEFAULT_REGION"]
+}
+
 MySQLConnArgs = {
   "user": os.environ['MYSQL_USER'],
   "password": os.environ['MYSQL_PWD'],
