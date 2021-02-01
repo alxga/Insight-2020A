@@ -341,11 +341,6 @@ class HlyDelaysCalculator:
         HlyDelaysCalculator._push_hlydelays_dbtpls(rows, pqDate, noRouteVal)
     )
 
-  def update_json(self, dfHlyDelays, pqDate, noRouteVal=None):
-    obj_key = pqDate.strftime("%Y%m%d.json")
-    s3_path = "s3a://%s/%s" % (Settings.S3BucketName, obj_key)
-    dfHlyDelays.write.json(s3_path)
-
 
   @staticmethod
   def _push_hlydelays_dbtpls(rows, pqDate, noRouteVal):
@@ -496,7 +491,7 @@ def run(spark):
   gtfsFetcher = GTFSFetcher(spark)
   with DBConn() as conn:
     entriesToProcess = dbtables.PqDates \
-      .select_pqdates_not_in_delays(conn, Settings.InsertVPDelays)
+      .select_pqdates_not_in_delays(conn)
   for entry in entriesToProcess:
     targetDate = entry["Date"]
 
@@ -521,15 +516,6 @@ def run(spark):
         VPDelaysCalculator(spark, targetDate, dfStopTimes, dfVehPos)
       dfVPDelays = calcVPDelays.create_result_df()
 
-      if Settings.InsertVPDelays and not entry["IsInVPDelays"]:
-        with DBConn() as conn:
-          dbtables.VPDelays.delete_for_parquet(conn, targetDate)
-          conn.commit()
-        calcVPDelays.update_db(dfVPDelays)
-        with DBConn() as conn:
-          dbtables.PqDates.update_in_delays(conn, targetDate, "IsInVPDelays")
-          conn.commit()
-
       calcHlyDelays = HlyDelaysCalculator(spark, dfVPDelays)
       dfHlyDelays = calcHlyDelays.create_result_df().persist()
       dfGrpRoutes = calcHlyDelays.group_routes(dfHlyDelays)
@@ -546,8 +532,6 @@ def run(spark):
         with DBConn() as conn:
           dbtables.HlyDelays.delete_for_parquet(conn, targetDate)
           conn.commit()
-        calcHlyDelays.update_json(dfHlyDelays, pqDate)
-        return
 
         calcHlyDelays.update_db(dfHlyDelays, targetDate)
         calcHlyDelays.update_db(dfGrpRoutes, targetDate)

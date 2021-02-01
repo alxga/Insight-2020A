@@ -284,8 +284,8 @@ class PqDates:
       `D` Date PRIMARY KEY,
       `NumKeys` integer NOT NULL,
       `NumRecs` integer NOT NULL,
-      `IsInVPDelays` tinyint(1) DEFAULT '0',
-      `IsInHlyDelays` tinyint(1) DEFAULT '0'
+      `IsInHlyDelays` tinyint(1) DEFAULT '0',
+      `IsInDynamo` tinyint(1) DEFAULT '0'
     );
   """
 
@@ -308,46 +308,37 @@ class PqDates:
 
 
   @staticmethod
-  def select_pqdates_not_in_delays(conn, withVPDelays):
+  def select_pqdates_not_in_delays(conn):
     """Retrieves a list of Parquet files for which delays need to be calculated
 
     Args:
       conn: a DBConn instance
-      withVPDelays: whether to return dates not in the VPDelays table (dates
-    not in the HlyDelays table are always returned)
     """
 
-    whFlags = "(not IsInVPDelays or not IsInHlyDelays)" if withVPDelays \
-      else "not IsInHlyDelays"
     sqlStmt = """
-      SELECT D, IsInVPDelays, IsInHlyDelays FROM `PqDates`
-      WHERE NumRecs > 0 and %s;
-    """ % whFlags
+      SELECT D, IsInHlyDelays FROM `PqDates`
+      WHERE NumRecs > 0 and not IsInHlyDelays;
+    """
     ret = []
     cur = conn.execute(sqlStmt)
     for row in cur:
       ret.append({
         "Date": row[0],
-        "IsInVPDelays": row[1],
-        "IsInHlyDelays": row[2]
+        "IsInHlyDelays": row[1]
       })
     return ret
 
   @staticmethod
-  def select_latest_processed(conn, withVPDelays):
+  def select_latest_processed(conn):
     """Returns the latest date for which delays were calculated from Parquet
 
     Args:
       conn: a DBConn instance
-      withVPDelays: whether to filter out the dates for which IsInVPDelays is
-    not True
     """
 
-    whFlags = "IsInVPDelays and IsInHlyDelays" if withVPDelays \
-      else "IsInHlyDelays"
     sqlStmt = """
       SELECT max(D) FROM `PqDates`
-      WHERE NumRecs > 0 and %s;
+      WHERE NumRecs > 0 and IsInHlyDelays;
     """ % whFlags
     cur = conn.execute(sqlStmt)
     try:
@@ -364,7 +355,7 @@ class PqDates:
     Args:
       conn: a DBConn instance
       D: Parquet file date for which the column should be set
-      delaysColName: column name - IsInVPDelays or IsInHlyDelays
+      delaysColName: column name - IsInHlyDelays
     """
 
     sqlStmt = """

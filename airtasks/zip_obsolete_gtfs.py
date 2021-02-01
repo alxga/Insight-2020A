@@ -53,8 +53,7 @@ def main():
   feedDescs = gtfs.read_feed_descs(content)
 
   with DBConn() as conn:
-    dtNow = dbtables.PqDates \
-      .select_latest_processed(conn, Settings.InsertVPDelays)
+    dtNow = dbtables.PqDates.select_latest_processed(conn)
   if not dtNow:
     return
 

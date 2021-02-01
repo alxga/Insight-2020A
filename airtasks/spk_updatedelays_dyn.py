@@ -578,7 +578,7 @@ def run(spark):
   gtfsFetcher = GTFSFetcher(spark)
   with DBConn() as conn:
     entriesToProcess = dbtables.PqDates \
-      .select_pqdates_not_in_delays(conn, Settings.InsertVPDelays)
+      .select_pqdates_not_in_delays(conn)
   for entry in entriesToProcess:
     targetDate = entry["Date"]
 
@@ -605,7 +605,7 @@ def run(spark):
 
       cols_order = ['RouteId', 'StopId', 'HourEST', 'AvgDelay', 'AvgDist', 'Cnt']
       calcHlyDelays = HlyDelaysCalculator(spark, dfVPDelays)
-      dfHlyDelays = calcHlyDelays.create_result_df()
+      dfHlyDelays = calcHlyDelays.create_result_df().persist()
       dfGrpRoutes = calcHlyDelays.group_routes(dfHlyDelays) \
         .withColumn('StopId', F.lit('ALLSTOPS'))
       dfGrpStops = calcHlyDelays.group_stops(dfHlyDelays) \
