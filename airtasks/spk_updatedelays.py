@@ -526,22 +526,21 @@ def run(spark):
       dfGrpStopsTrain = calcHlyDelays.group_stops(dfHlyDelaysTrain)
       dfGrpAllTrain = calcHlyDelays.group_all(dfHlyDelaysTrain)
 
-      if not entry["IsInHlyDelays"]:
-        with DBConn() as conn:
-          dbtables.HlyDelays.delete_for_parquet(conn, targetDate)
-          conn.commit()
+      with DBConn() as conn:
+        dbtables.HlyDelays.delete_for_parquet(conn, targetDate)
+        conn.commit()
 
-        calcHlyDelays.update_db(dfHlyDelays, targetDate)
-        calcHlyDelays.update_db(dfGrpRoutes, targetDate)
-        calcHlyDelays.update_db(dfGrpStops, targetDate)
-        calcHlyDelays.update_db(dfGrpAll, targetDate)
-        calcHlyDelays.update_db(dfGrpStopsBus, targetDate, "ALLBUSES")
-        calcHlyDelays.update_db(dfGrpAllBus, targetDate, "ALLBUSES")
-        calcHlyDelays.update_db(dfGrpStopsTrain, targetDate, "ALLTRAINS")
-        calcHlyDelays.update_db(dfGrpAllTrain, targetDate, "ALLTRAINS")
-        with DBConn() as conn:
-          dbtables.PqDates.update_in_delays(conn, targetDate, "IsInHlyDelays")
-          conn.commit()
+      calcHlyDelays.update_db(dfHlyDelays, targetDate)
+      calcHlyDelays.update_db(dfGrpRoutes, targetDate)
+      calcHlyDelays.update_db(dfGrpStops, targetDate)
+      calcHlyDelays.update_db(dfGrpAll, targetDate)
+      calcHlyDelays.update_db(dfGrpStopsBus, targetDate, "ALLBUSES")
+      calcHlyDelays.update_db(dfGrpAllBus, targetDate, "ALLBUSES")
+      calcHlyDelays.update_db(dfGrpStopsTrain, targetDate, "ALLTRAINS")
+      calcHlyDelays.update_db(dfGrpAllTrain, targetDate, "ALLTRAINS")
+      with DBConn() as conn:
+        dbtables.PqDates.update_in_delays(conn, targetDate, "IsInHlyDelays")
+        conn.commit()
 
 
 if __name__ == "__main__":
