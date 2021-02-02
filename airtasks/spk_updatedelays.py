@@ -491,10 +491,8 @@ def run(spark):
   gtfsFetcher = GTFSFetcher(spark)
   with DBConn() as conn:
     entriesToProcess = dbtables.PqDates \
-      .select_pqdates_not_in_delays(conn)
-  for entry in entriesToProcess:
-    targetDate = entry["Date"]
-
+      .select_pqdates_not_in_delays(conn, 'NOT IsInHlyDelays')
+  for targetDate in entriesToProcess:
     if dfStopTimes is None or not curFeedDesc.includes_date(targetDate):
       curFeedDesc = None
       dfStopTimes = None

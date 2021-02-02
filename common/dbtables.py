@@ -288,7 +288,8 @@ class PqDates:
       `D` Date PRIMARY KEY,
       `NumKeys` integer NOT NULL,
       `NumRecs` integer NOT NULL,
-      `IsInHlyDelays` tinyint(1) DEFAULT '0'
+      `IsInHlyDelaysS3` tinyint(1) DEFAULT '0',
+      `IsInHlyDelaysDyn` tinyint(1) DEFAULT '0'
     );
   """
 
@@ -311,28 +312,23 @@ class PqDates:
 
 
   @staticmethod
-  def select_pqdates_not_in_delays(conn):
+  def select_pqdates_not_in_delays(conn, wh_stmt):
     """Retrieves a list of Parquet files for which delays need to be calculated
 
     Args:
       conn: a DBConn instance
+      wh_stmt: a where statment to apply (NumRecs > 0 is always applied)
     """
 
     sqlStmt = """
-      SELECT D, IsInHlyDelays FROM `PqDates`
-      WHERE NumRecs > 0 and not IsInHlyDelays;
-    """
-    ret = []
+      SELECT D FROM `PqDates`
+      WHERE NumRecs > 0 AND ({wh_stmt});
+    """.format(wh_stmt=wh_stmt)
     cur = conn.execute(sqlStmt)
-    for row in cur:
-      ret.append({
-        "Date": row[0],
-        "IsInHlyDelays": row[1]
-      })
-    return ret
+    return list(x[0] for x in cur)
 
   @staticmethod
-  def select_latest_processed(conn):
+  def select_latest_processed(conn, flag_column='IsInHlyDelaysS3'):
     """Returns the latest date for which delays were calculated from Parquet
 
     Args:
@@ -341,8 +337,8 @@ class PqDates:
 
     sqlStmt = """
       SELECT max(D) FROM `PqDates`
-      WHERE NumRecs > 0 and IsInHlyDelays;
-    """
+      WHERE NumRecs > 0 and {flag_column};
+    """.format(flag_column=flag_column)
     cur = conn.execute(sqlStmt)
     try:
       row = next(cur)
@@ -352,19 +348,19 @@ class PqDates:
 
 
   @staticmethod
-  def update_in_delays(conn, D, delaysColName):
+  def update_in_delays(conn, D, flag_column):
     """Sets a delays column in a PqDates table to True
 
     Args:
       conn: a DBConn instance
       D: Parquet file date for which the column should be set
-      delaysColName: column name - IsInHlyDelays
+      flag_column: delays column to update
     """
 
     sqlStmt = """
       UPDATE `PqDates` SET `%s` = True
       WHERE D = '%s';
-    """ % (delaysColName, D.strftime("%Y-%m-%d"))
+    """ % (flag_column, D.strftime("%Y-%m-%d"))
     conn.execute(sqlStmt)
 
 

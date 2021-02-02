@@ -1,12 +1,12 @@
 import re
 import decimal
-from datetime import date
 
 import pandas as pd
 import boto3.dynamodb.types as dyndbtypes
 
-from common import s3, dyndb, Settings
 from common import utils
+from common import s3, dyndb, dbtables, Settings
+from common.queryutils import DBConn
 
 __author__ = "Alex Ganin"
 
@@ -52,12 +52,15 @@ def main():
   """Checks for feed updates on the MBTA website and saves any updates to S3
   """
 
-  tg_dates = [
-    date(2020, 7, 10), date(2020, 7, 11), date(2020, 7, 12),
-    date(2020, 7, 13), date(2020, 7, 14)
-  ]
-  for dt in tg_dates:
-    _process_pqdate(dt)
+  with DBConn() as conn:
+    wh_stmt = 'IsInHlyDelaysS3 AND NOT IsInHlyDelaysDyn'
+    entriesToProcess = dbtables.PqDates \
+      .select_pqdates_not_in_delays(conn, wh_stmt)
+  for targetDate in entriesToProcess:
+    _process_pqdate(targetDate)
+    with DBConn() as conn:
+      dbtables.PqDates.update_in_delays(conn, targetDate, "IsInHlyDelaysDyn")
+      conn.commit()
 
 if __name__ == "__main__":
   main()

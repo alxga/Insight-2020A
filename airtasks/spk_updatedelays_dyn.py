@@ -563,10 +563,8 @@ def run(spark):
   gtfsFetcher = GTFSFetcher(spark)
   with DBConn() as conn:
     entriesToProcess = dbtables.PqDates \
-      .select_pqdates_not_in_delays(conn)
-  for entry in entriesToProcess:
-    targetDate = entry["Date"]
-
+      .select_pqdates_not_in_delays(conn, 'NOT IsInHlyDelaysS3')
+  for targetDate in entriesToProcess:
     if dfStopTimes is None or not curFeedDesc.includes_date(targetDate):
       curFeedDesc = None
       dfStopTimes = None
@@ -629,6 +627,10 @@ def run(spark):
         .union(dfGrpAllTrain[cols_order])
 
       calcHlyDelays.update_s3(dfAllHly, targetDate)
+
+      with DBConn() as conn:
+        dbtables.PqDates.update_in_delays(conn, targetDate, "IsInHlyDelaysS3")
+        conn.commit()
 
 
 if __name__ == "__main__":
