@@ -322,7 +322,8 @@ class PqDates:
 
     sqlStmt = """
       SELECT D FROM `PqDates`
-      WHERE NumRecs > 0 AND ({wh_stmt});
+      WHERE NumRecs > 0 AND ({wh_stmt})
+      ORDER BY D;
     """.format(wh_stmt=wh_stmt)
     cur = conn.execute(sqlStmt)
     return list(x[0] for x in cur)

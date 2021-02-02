@@ -21,6 +21,8 @@ def _process_df(df, pqDate):
     decCtx.traps[decimal.Inexact] = False
     decCtx.traps[decimal.Rounded] = False
     for row in df.itertuples(index=False):
+      if row.route_stop[0:3] != 'Red':
+        continue
       vals = [{
         'HourEST': x['HourEST'],
         'AvgDelay': decCtx.create_decimal_from_float(x['AvgDelay']),
