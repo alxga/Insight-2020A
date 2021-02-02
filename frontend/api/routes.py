@@ -16,7 +16,10 @@ __author__ = "Alex Ganin"
 @bp.route('/routeids', methods=['GET'])
 def get_routeids():
   sqlStmt = """
-    SELECT DISTINCT RouteId FROM RouteStops ORDER BY 1;
+    SELECT DISTINCT RouteId FROM RouteStops
+    WHERE RouteId <> 'ALLROUTES' AND RouteId <> 'ALLTRAINS' AND
+      RouteId <> 'ALLBUSES'
+    ORDER BY 1;
   """
   ret = []
   with DBConn() as con:
@@ -35,7 +38,9 @@ def get_stopnames():
   routeId = request.args.get('routeId', None)
   q = request.args.get('q', '').lower()
 
-  sqlStmt = "SELECT DISTINCT StopName FROM RouteStops"
+  sqlStmt = """
+    SELECT DISTINCT StopName FROM RouteStops
+  """
   if routeId:
     sqlStmt += " WHERE RouteId = %s"
     params = (routeId,)
@@ -47,7 +52,7 @@ def get_stopnames():
   with DBConn() as con:
     cur = con.execute(sqlStmt, params)
     for row in cur:
-      if not row[0]:
+      if not row[0] or row[0] == 'ALLSTOPS':
         continue
       stopName = row[0].strip()
       stopNameLower = stopName.lower()
