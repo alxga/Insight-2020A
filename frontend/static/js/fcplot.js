@@ -135,13 +135,20 @@ function FCPlot(divSelector) {
             return data;
         }
       });
+
+    if (_this.xLims[0] > _this.xLims[1])
+      effXLims = [new Date(2020, 0, 1), new Date(2020, 0, 1)];
+    else {
+      effXLims = _this.xLims;
+    }
+      
     
     _this.chart = fc.chartCartesian(yScale, d3.scaleLinear())
       // .xAxisHeight('3.5em')
       .yOrient('left')
       .xLabel('Date')
       .yLabel('Delay, seconds')
-      .xDomain(_this.xLims)
+      .xDomain(effXLims)
       .yDomain(_this.yLims)
       .xTicks(xTickFilter)
       .xTickFormat(d3.timeFormat('%b-%d'))

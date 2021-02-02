@@ -22,8 +22,7 @@ def get_routeids():
   with DBConn() as con:
     cur = con.execute(sqlStmt)
     for row in cur:
-      if row[0] and row[0] != 'ALLBUSES' and row[0] != 'ALLTRAINS' and \
-         row[0] != 'ALLROUTES':
+      if row[0]:
         ret.append(row[0])
   data = {
     "items": ret
@@ -41,7 +40,6 @@ def get_stopnames():
     sqlStmt += " WHERE RouteId = %s"
     params = (routeId,)
   else:
-    sqlStmt += " WHERE RouteId IS NULL"
     params = None
   sqlStmt += " ORDER BY 1;"
 
@@ -62,6 +60,10 @@ def get_stopnames():
 
 
 def query_delays_hourly(routeId, stopName):
+  if not routeId:
+    routeId = 'ALLROUTES'
+  if not stopName:
+    stopName = 'ALLSTOPS'
   dynKey = f'{routeId}:::[{stopName}]'
   dynDb = DynDBMgr()
   dynTbl = dynDb.table('hlydelays')

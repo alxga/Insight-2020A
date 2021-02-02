@@ -614,14 +614,6 @@ def run(spark):
         .withColumn('RouteId', F.lit('ALLTRAINS')) \
         .withColumn('StopName', F.lit('ALLSTOPS'))
 
-      with DBConnCommonQueries() as conn:
-        dbtables.create_if_not_exists(conn, dbtables.RouteStops)
-        data = dfHlyDelays[['RouteId', 'StopName']] \
-          .distinct() \
-          .collect()
-        dbtables.RouteStops.insert_values(conn, data)
-        conn.commit()
-
       dfAllHly = dfHlyDelays[cols_order] \
         .union(dfGrpRoutes[cols_order]) \
         .union(dfGrpStops[cols_order]) \
@@ -630,6 +622,14 @@ def run(spark):
         .union(dfGrpAllBus[cols_order]) \
         .union(dfGrpStopsTrain[cols_order]) \
         .union(dfGrpAllTrain[cols_order])
+
+      with DBConnCommonQueries() as conn:
+        dbtables.create_if_not_exists(conn, dbtables.RouteStops)
+        data = dfAllHly[['RouteId', 'StopName']] \
+          .distinct() \
+          .collect()
+        dbtables.RouteStops.insert_values(conn, data)
+        conn.commit()
 
       calcHlyDelays.update_s3(dfAllHly, targetDate)
 

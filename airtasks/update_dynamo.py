@@ -22,14 +22,19 @@ def _process_df(df, pqDate):
     decCtx.traps[decimal.Inexact] = False
     decCtx.traps[decimal.Rounded] = False
     for row in df.itertuples(index=False):
-      if row.route_stop[0:3] != 'Red':
-        continue
+      # m = re.match(r'(?P<route>.*):::\[(?P<stop>.*)\]', row.route_stop)
+      # if not m:
+      #   continue
+      # if m['route'] != 'Red' and (
+      #   m['route'] != 'ALLROUTES' or (m['stop'] != 'Harvard' and m['stop'] != 'ALLSTOPS')
+      # ):
+      #   continue
       vals = []
       for x in row.vals:
         dt = x['DateEST']
         dt = datetime(dt.year, dt.month, dt.day, x['HourEST'], 30, 0)
         vals.append({
-          'DT_EST': dt.strftime('%Y-%m-%d %H-%M-%S'),
+          'DT_EST': dt.strftime('%Y-%m-%d %H:%M:%S'),
           'AvgDelay': decCtx.create_decimal_from_float(x['AvgDelay']),
           'AvgDist': decCtx.create_decimal_from_float(x['AvgDist']),
           'Cnt': int(x['Cnt'])
