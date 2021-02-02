@@ -4,6 +4,7 @@ from collections import namedtuple
 import csv
 from flask import jsonify, request, Response
 from common.queryutils import DBConn
+from common.dyndb import DynDBMgr
 from common import Settings
 from .. import math
 from . import bp
@@ -61,21 +62,14 @@ def get_stopnames():
 
 def query_delays_hourly(routeId, stopName):
   params = []
-  sqlStmt = """
-    SELECT DateEST, HourEST, AvgDelay, AvgDist, Cnt FROM HlyDelays WHERE
-  """
-  if routeId:
-    sqlStmt += " RouteId = %s and"
-    params.append(routeId)
-  else:
-    sqlStmt += " RouteId IS NULL and"
-
-  if stopName:
-    sqlStmt += " StopName = %s"
-    params.append(stopName)
-  else:
-    sqlStmt += " StopName IS NULL"
-  sqlStmt += " ORDER BY DateEST, HourEST;"
+  dynKey = f'{routeId}:::[{stopName}]'
+  dynDb = DynDBMgr()
+  dynTbl = dynDb.table('hlydelays')
+  response = dynTbl.query(
+    KeyConditionExpression=Key('route_stop').eq(dynKey)
+  )
+  for item in response['Items']:
+    pass
 
   Record = namedtuple("HlyDelayRec", "DateEST HourEST AvgDelay AvgDist Cnt")
   with DBConn() as con:

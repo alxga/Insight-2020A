@@ -4,7 +4,7 @@
 // Special routes dictionary, maps from representation in lists to 
 // the API values
 SPEC_ROUTES = {
-  "": "",
+  "": "ALLROUTES",
   "Buses Only": "ALLBUSES",
   "Trains Only": "ALLTRAINS"
 }
@@ -98,6 +98,9 @@ function updateDataAndPlot() {
 
   if (routeId in SPEC_ROUTES) {
     routeId = SPEC_ROUTES[routeId]
+  }
+  if (!stopName) {
+    stopName = "ALLSTOPS"
   }
 
   $.ajax({

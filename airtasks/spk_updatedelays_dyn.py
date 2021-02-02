@@ -129,13 +129,13 @@ class VPDelaysCalculator:
               pytz.exceptions.NonExistentTimeError):
         continue
       stopTimeLst.append(dict(
-          tripId=stopTimeRec[0],
-          stopId=stopTimeRec[1],
-          stopSeq=stopTimeRec[3],
-          stopName=stopTimeRec[4],
-          routeId=stopTimeRec[8],
-          coords=shapelib.Point.FromLatLng(stopTimeRec[6], stopTimeRec[7]),
-          schedDT=dt.replace(tzinfo=None)
+        tripId=stopTimeRec[0],
+        stopId=stopTimeRec[1],
+        stopSeq=stopTimeRec[3],
+        stopName=stopTimeRec[4],
+        routeId=stopTimeRec[8],
+        coords=shapelib.Point.FromLatLng(stopTimeRec[6], stopTimeRec[7]),
+        schedDT=dt.replace(tzinfo=None)
       ))
 
     vehPosLst = []
@@ -250,8 +250,8 @@ class HlyDelaysCalculator:
     )
     dfResult = self.dfVPDelays \
       .withColumn(
-          "datehour",
-          udf_datetime_to_datehour(self.dfVPDelays.SchedDT)
+        "datehour",
+        udf_datetime_to_datehour(self.dfVPDelays.SchedDT)
       )
     dfResult = dfResult.filter("EstDist < 100")
     dfResult = dfResult \
@@ -260,16 +260,16 @@ class HlyDelaysCalculator:
       .drop("datehour")
     dfResult = dfResult \
       .groupBy(
-          dfResult.DateEST, dfResult.HourEST,
-          dfResult.RouteId, dfResult.StopName
+        dfResult.DateEST, dfResult.HourEST,
+        dfResult.RouteId, dfResult.StopName
       ) \
       .agg(
-            F.mean(dfResult.EstDelay).alias("AvgDelay"),
-            F.mean(dfResult.EstDist).alias("AvgDist"),
-            F.count(F.lit(1)).alias("Cnt"),
-            F.first(dfResult.StopLat).alias("StopLat"),
-            F.first(dfResult.StopLon).alias("StopLon"),
-            F.first(dfResult.StopId).alias("StopId")
+        F.mean(dfResult.EstDelay).alias("AvgDelay"),
+        F.mean(dfResult.EstDist).alias("AvgDist"),
+        F.count(F.lit(1)).alias("Cnt"),
+        F.first(dfResult.StopLat).alias("StopLat"),
+        F.first(dfResult.StopLon).alias("StopLon"),
+        F.first(dfResult.StopId).alias("StopId")
       )
 
     return dfResult
@@ -282,14 +282,15 @@ class HlyDelaysCalculator:
 
     dfResult = dfHlyDelays \
       .groupBy(
-          dfHlyDelays.DateEST, dfHlyDelays.HourEST, dfHlyDelays.RouteId
+        dfHlyDelays.DateEST, dfHlyDelays.HourEST, dfHlyDelays.RouteId
       ) \
       .agg(
-          (F.sum(dfHlyDelays.AvgDelay * dfHlyDelays.Cnt) /
-           F.sum(dfHlyDelays.Cnt)).alias("AvgDelay"),
-          (F.sum(dfHlyDelays.AvgDist * dfHlyDelays.Cnt) /
-           F.sum(dfHlyDelays.Cnt)).alias("AvgDist"),
-          F.sum(dfHlyDelays.Cnt).alias("Cnt"))
+        (F.sum(dfHlyDelays.AvgDelay * dfHlyDelays.Cnt) /
+          F.sum(dfHlyDelays.Cnt)).alias("AvgDelay"),
+        (F.sum(dfHlyDelays.AvgDist * dfHlyDelays.Cnt) /
+          F.sum(dfHlyDelays.Cnt)).alias("AvgDist"),
+        F.sum(dfHlyDelays.Cnt).alias("Cnt")
+      )
     return dfResult
 
 
@@ -300,17 +301,17 @@ class HlyDelaysCalculator:
 
     dfResult = dfHlyDelays \
       .groupBy(
-          dfHlyDelays.DateEST, dfHlyDelays.HourEST, dfHlyDelays.StopName
+        dfHlyDelays.DateEST, dfHlyDelays.HourEST, dfHlyDelays.StopName
       ) \
       .agg(
-          (F.sum(dfHlyDelays.AvgDelay * dfHlyDelays.Cnt) /
-           F.sum(dfHlyDelays.Cnt)).alias("AvgDelay"),
-          (F.sum(dfHlyDelays.AvgDist * dfHlyDelays.Cnt) /
-           F.sum(dfHlyDelays.Cnt)).alias("AvgDist"),
-          F.sum(dfHlyDelays.Cnt).alias("Cnt"),
-          F.first(dfHlyDelays.StopLat).alias("StopLat"),
-          F.first(dfHlyDelays.StopLon).alias("StopLon"),
-          F.first(dfHlyDelays.StopId).alias("StopId")
+        (F.sum(dfHlyDelays.AvgDelay * dfHlyDelays.Cnt) /
+          F.sum(dfHlyDelays.Cnt)).alias("AvgDelay"),
+        (F.sum(dfHlyDelays.AvgDist * dfHlyDelays.Cnt) /
+          F.sum(dfHlyDelays.Cnt)).alias("AvgDist"),
+        F.sum(dfHlyDelays.Cnt).alias("Cnt"),
+        F.first(dfHlyDelays.StopLat).alias("StopLat"),
+        F.first(dfHlyDelays.StopLon).alias("StopLon"),
+        F.first(dfHlyDelays.StopId).alias("StopId")
       )
     return dfResult
 
@@ -322,14 +323,14 @@ class HlyDelaysCalculator:
 
     dfResult = dfHlyDelays \
       .groupBy(
-          dfHlyDelays.DateEST, dfHlyDelays.HourEST
+        dfHlyDelays.DateEST, dfHlyDelays.HourEST
       ) \
       .agg(
-          (F.sum(dfHlyDelays.AvgDelay * dfHlyDelays.Cnt) /
-           F.sum(dfHlyDelays.Cnt)).alias("AvgDelay"),
-          (F.sum(dfHlyDelays.AvgDist * dfHlyDelays.Cnt) /
-           F.sum(dfHlyDelays.Cnt)).alias("AvgDist"),
-          F.sum(dfHlyDelays.Cnt).alias("Cnt")
+        (F.sum(dfHlyDelays.AvgDelay * dfHlyDelays.Cnt) /
+          F.sum(dfHlyDelays.Cnt)).alias("AvgDelay"),
+        (F.sum(dfHlyDelays.AvgDist * dfHlyDelays.Cnt) /
+          F.sum(dfHlyDelays.Cnt)).alias("AvgDist"),
+        F.sum(dfHlyDelays.Cnt).alias("Cnt")
       )
     return dfResult
 
@@ -340,9 +341,9 @@ class HlyDelaysCalculator:
 
     s3Mgr = s3.S3Mgr()
     pfx = f"HlyDelays/{pqDate.strftime('%Y%m%d.pq')}"
-    s3Mgr.delete_prefix(pfx)
-
-    time.sleep(5)
+    if s3Mgr.prefix_exists(pfx):
+      s3Mgr.delete_prefix(pfx)
+      time.sleep(5)
 
     dfHlyDelays = dfHlyDelays \
       .withColumn(
@@ -357,20 +358,21 @@ class HlyDelaysCalculator:
       .agg(
         F.collect_list(
           F.struct(
-            dfHlyDelays.HourEST, dfHlyDelays.AvgDelay,
-            dfHlyDelays.AvgDist, dfHlyDelays.Cnt
+            dfHlyDelays.DateEST, dfHlyDelays.HourEST,
+            dfHlyDelays.AvgDelay, dfHlyDelays.AvgDist, dfHlyDelays.Cnt
           )
         ).alias('vals_unsorted')
       )
 
     udf_ret_type = ArrayType(StructType([
+      StructField("DateEST", DateType(), False),
       StructField("HourEST", IntegerType(), False),
       StructField("AvgDelay", DoubleType(), False),
       StructField("AvgDist", DoubleType(), False),
       StructField("Cnt", IntegerType(), False)
     ]))
     udf_sort_vals = F.udf(lambda vals:
-      list(sorted(vals, key=lambda r: r.HourEST)),
+      list(sorted(vals, key=lambda r: (r.DateEST, r.HourEST))),
       udf_ret_type
     )
     dfHlyDelays = dfHlyDelays \
@@ -586,7 +588,10 @@ def run(spark):
         VPDelaysCalculator(spark, targetDate, dfStopTimes, dfVehPos)
       dfVPDelays = calcVPDelays.create_result_df()
 
-      cols_order = ['RouteId', 'StopName', 'HourEST', 'AvgDelay', 'AvgDist', 'Cnt']
+      cols_order = [
+        'RouteId', 'StopName', 'DateEST', 'HourEST',
+        'AvgDelay', 'AvgDist', 'Cnt'
+      ]
       calcHlyDelays = HlyDelaysCalculator(spark, dfVPDelays)
       dfHlyDelays = calcHlyDelays.create_result_df().persist()
       dfGrpRoutes = calcHlyDelays.group_routes(dfHlyDelays) \

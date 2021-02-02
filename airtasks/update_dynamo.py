@@ -1,12 +1,15 @@
 import re
 import decimal
+from datetime import date
 
 import pandas as pd
 import boto3.dynamodb.types as dyndbtypes
+from boto3.dynamodb.conditions import Key
 
 from common import utils
 from common import s3, dyndb, dbtables, Settings
 from common.queryutils import DBConn
+from common.dyndb import DynDBMgr
 
 __author__ = "Alex Ganin"
 
@@ -64,5 +67,22 @@ def main():
       dbtables.PqDates.update_in_delays(conn, targetDate, "IsInHlyDelaysDyn")
       conn.commit()
 
+
+def main_dbg():
+  routeId = 'Red'
+  stopName = 'Harvard'
+  dynKey = f'{routeId}:::[{stopName}]'
+  dynDb = DynDBMgr()
+  dynTbl = dynDb.table('hlydelays')
+  response = dynTbl.query(
+    KeyConditionExpression=Key('route_stop').eq(dynKey)
+  )
+  for item in response['Items']:
+    
+    dt = datetime(rec.DateEST.year, rec.DateEST.month, rec.DateEST.day,
+                  rec.HourEST, 30, 0)
+    dt = Settings.MBTA_TZ.localize(dt)
+
+
 if __name__ == "__main__":
-  main()
+  main_dbg()
