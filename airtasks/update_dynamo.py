@@ -1,15 +1,13 @@
 import re
 import decimal
-from datetime import date
+from datetime import datetime
 
 import pandas as pd
 import boto3.dynamodb.types as dyndbtypes
-from boto3.dynamodb.conditions import Key
 
 from common import utils
 from common import s3, dyndb, dbtables, Settings
 from common.queryutils import DBConn
-from common.dyndb import DynDBMgr
 
 __author__ = "Alex Ganin"
 
@@ -26,19 +24,22 @@ def _process_df(df, pqDate):
     for row in df.itertuples(index=False):
       if row.route_stop[0:3] != 'Red':
         continue
-      vals = [{
-        'HourEST': x['HourEST'],
-        'AvgDelay': decCtx.create_decimal_from_float(x['AvgDelay']),
-        'AvgDist': decCtx.create_decimal_from_float(x['AvgDist']),
-        'Cnt': int(x['Cnt'])
-      } for x in row.vals]
+      vals = []
+      for x in row.vals:
+        dt = x['DateEST']
+        dt = datetime(dt.year, dt.month, dt.day, x['HourEST'], 30, 0)
+        vals.append({
+          'DT_EST': dt.strftime('%Y-%m-%d %H-%M-%S'),
+          'AvgDelay': decCtx.create_decimal_from_float(x['AvgDelay']),
+          'AvgDist': decCtx.create_decimal_from_float(x['AvgDist']),
+          'Cnt': int(x['Cnt'])
+        })
       d = {
         'route_stop': row.route_stop,
         'date': pqDate.strftime('%Y%m%d'),
         'vals': vals
       }
       dynWriter.put_item(Item=d)
-
 
 
 def _process_pqdate(pqDate):
@@ -68,21 +69,5 @@ def main():
       conn.commit()
 
 
-def main_dbg():
-  routeId = 'Red'
-  stopName = 'Harvard'
-  dynKey = f'{routeId}:::[{stopName}]'
-  dynDb = DynDBMgr()
-  dynTbl = dynDb.table('hlydelays')
-  response = dynTbl.query(
-    KeyConditionExpression=Key('route_stop').eq(dynKey)
-  )
-  for item in response['Items']:
-    
-    dt = datetime(rec.DateEST.year, rec.DateEST.month, rec.DateEST.day,
-                  rec.HourEST, 30, 0)
-    dt = Settings.MBTA_TZ.localize(dt)
-
-
 if __name__ == "__main__":
-  main_dbg()
+  main()
