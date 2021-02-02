@@ -1,10 +1,12 @@
 from io import StringIO
-from datetime import datetime
 from collections import namedtuple
 import csv
 from flask import jsonify, request, Response
+
+from boto3.dynamodb.conditions import Key
+
 from common.queryutils import DBConn
-from common import Settings
+from common.dyndb import DynDBMgr
 from .. import math
 from . import bp
 
@@ -14,13 +16,14 @@ __author__ = "Alex Ganin"
 @bp.route('/routeids', methods=['GET'])
 def get_routeids():
   sqlStmt = """
-    SELECT DISTINCT RouteId FROM HlyDelays ORDER BY 1;
+    SELECT DISTINCT RouteId FROM RouteStops ORDER BY 1;
   """
   ret = []
   with DBConn() as con:
     cur = con.execute(sqlStmt)
     for row in cur:
-      if row[0] and row[0] != 'ALLBUSES' and row[0] != 'ALLTRAINS':
+      if row[0] and row[0] != 'ALLBUSES' and row[0] != 'ALLTRAINS' and \
+         row[0] != 'ALLROUTES':
         ret.append(row[0])
   data = {
     "items": ret
@@ -33,7 +36,7 @@ def get_stopnames():
   routeId = request.args.get('routeId', None)
   q = request.args.get('q', '').lower()
 
-  sqlStmt = "SELECT DISTINCT StopName FROM HlyDelays"
+  sqlStmt = "SELECT DISTINCT StopName FROM RouteStops"
   if routeId:
     sqlStmt += " WHERE RouteId = %s"
     params = (routeId,)
@@ -59,47 +62,38 @@ def get_stopnames():
 
 
 def query_delays_hourly(routeId, stopName):
-  params = []
-  sqlStmt = """
-    SELECT DateEST, HourEST, AvgDelay, AvgDist, Cnt FROM HlyDelays WHERE
-  """
-  if routeId:
-    sqlStmt += " RouteId = %s and"
-    params.append(routeId)
-  else:
-    sqlStmt += " RouteId IS NULL and"
+  dynKey = f'{routeId}:::[{stopName}]'
+  dynDb = DynDBMgr()
+  dynTbl = dynDb.table('hlydelays')
+  response = dynTbl.query(
+    KeyConditionExpression=Key('route_stop').eq(dynKey)
+  )
 
-  if stopName:
-    sqlStmt += " StopName = %s"
-    params.append(stopName)
-  else:
-    sqlStmt += " StopName IS NULL"
-  sqlStmt += " ORDER BY DateEST, HourEST;"
+  Record = namedtuple("HlyDelayRec", "DT_EST AvgDelay Cnt")
+  recs = []
+  for it in sorted(response['Items'], key=lambda x: x['date']):
+    for val in it['vals']:
+      # dt = datetime.strptime(val['DT_EST'], '%Y-%m-%d %H-%M-%S')
+      # dt = Settings.MBTA_TZ.localize(dt)
+      recs.append(Record(
+        val['DT_EST'], float(val['AvgDelay']), float(val['Cnt'])
+      ))
+  if len(recs) < 2:
+    return []
 
-  Record = namedtuple("HlyDelayRec", "DateEST HourEST AvgDelay AvgDist Cnt")
-  with DBConn() as con:
-    cur = con.execute(sqlStmt, params)
-    records = [Record(*row) for row in cur]
+  x = [rec.AvgDelay for rec in recs]
+  w = [rec.Cnt for rec in recs]
+  xsmoothed = math.rolling_weighted_triangle_conv(x, w, 7)
 
   data = []
-
-  if len(records) > 2:
-    x = [rec.AvgDelay for rec in records]
-    w = [rec.Cnt for rec in records]
-    xsmoothed = math.rolling_weighted_triangle_conv(x, w, 7)
-
-    for i, rec in enumerate(records):
-      rec = records[i]
-      dt = datetime(rec.DateEST.year, rec.DateEST.month, rec.DateEST.day,
-                    rec.HourEST, 30, 0)
-      dt = Settings.MBTA_TZ.localize(dt)
-      data.append({
-        "dt": dt.strftime("%Y-%m-%d %H:%M:%S"),
-        "value": xsmoothed[i],
-        "cnt": rec.Cnt,
-        "unweighted_value": x[i]
-      })
-
+  for i, rec in enumerate(recs):
+    rec = recs[i]
+    data.append({
+      "dt": rec.DT_EST,
+      "value": xsmoothed[i],
+      "cnt": rec.Cnt,
+      "unweighted_value": x[i]
+    })
   return data
 
 

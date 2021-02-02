@@ -14,7 +14,11 @@ def create_if_not_exists(conn, cls):
   """
 
   if not conn.table_exists(cls.TABLE_NAME):
-    conn.execute(cls.CREATE_STMT)
+    if 'CREATE_STMT' in cls.__dict__:
+      conn.execute(cls.CREATE_STMT)
+    if 'CREATE_STMTS' in cls.__dict__:
+      for stmt in cls.CREATE_STMTS:
+        conn.execute(stmt)
     conn.commit()
 
 
@@ -284,8 +288,8 @@ class PqDates:
       `D` Date PRIMARY KEY,
       `NumKeys` integer NOT NULL,
       `NumRecs` integer NOT NULL,
-      `IsInVPDelays` tinyint(1) DEFAULT '0',
-      `IsInHlyDelays` tinyint(1) DEFAULT '0'
+      `IsInHlyDelaysS3` tinyint(1) DEFAULT '0',
+      `IsInHlyDelaysDyn` tinyint(1) DEFAULT '0'
     );
   """
 
@@ -308,47 +312,34 @@ class PqDates:
 
 
   @staticmethod
-  def select_pqdates_not_in_delays(conn, withVPDelays):
+  def select_pqdates_not_in_delays(conn, wh_stmt):
     """Retrieves a list of Parquet files for which delays need to be calculated
 
     Args:
       conn: a DBConn instance
-      withVPDelays: whether to return dates not in the VPDelays table (dates
-    not in the HlyDelays table are always returned)
+      wh_stmt: a where statment to apply (NumRecs > 0 is always applied)
     """
 
-    whFlags = "(not IsInVPDelays or not IsInHlyDelays)" if withVPDelays \
-      else "not IsInHlyDelays"
     sqlStmt = """
-      SELECT D, IsInVPDelays, IsInHlyDelays FROM `PqDates`
-      WHERE NumRecs > 0 and %s;
-    """ % whFlags
-    ret = []
+      SELECT D FROM `PqDates`
+      WHERE NumRecs > 0 AND ({wh_stmt})
+      ORDER BY D;
+    """.format(wh_stmt=wh_stmt)
     cur = conn.execute(sqlStmt)
-    for row in cur:
-      ret.append({
-        "Date": row[0],
-        "IsInVPDelays": row[1],
-        "IsInHlyDelays": row[2]
-      })
-    return ret
+    return list(x[0] for x in cur)
 
   @staticmethod
-  def select_latest_processed(conn, withVPDelays):
+  def select_latest_processed(conn, flag_column='IsInHlyDelaysS3'):
     """Returns the latest date for which delays were calculated from Parquet
 
     Args:
       conn: a DBConn instance
-      withVPDelays: whether to filter out the dates for which IsInVPDelays is
-    not True
     """
 
-    whFlags = "IsInVPDelays and IsInHlyDelays" if withVPDelays \
-      else "IsInHlyDelays"
     sqlStmt = """
       SELECT max(D) FROM `PqDates`
-      WHERE NumRecs > 0 and %s;
-    """ % whFlags
+      WHERE NumRecs > 0 and {flag_column};
+    """.format(flag_column=flag_column)
     cur = conn.execute(sqlStmt)
     try:
       row = next(cur)
@@ -358,19 +349,19 @@ class PqDates:
 
 
   @staticmethod
-  def update_in_delays(conn, D, delaysColName):
+  def update_in_delays(conn, D, flag_column):
     """Sets a delays column in a PqDates table to True
 
     Args:
       conn: a DBConn instance
       D: Parquet file date for which the column should be set
-      delaysColName: column name - IsInVPDelays or IsInHlyDelays
+      flag_column: delays column to update
     """
 
     sqlStmt = """
       UPDATE `PqDates` SET `%s` = True
       WHERE D = '%s';
-    """ % (delaysColName, D.strftime("%Y-%m-%d"))
+    """ % (flag_column, D.strftime("%Y-%m-%d"))
     conn.execute(sqlStmt)
 
 
@@ -526,3 +517,45 @@ class HlyDelays:
       DELETE FROM `HlyDelays` WHERE D = '%s';
     """ % D.strftime("%Y-%m-%d")
     conn.execute(sqlStmt)
+
+
+class RouteStops:
+  """DynKeys table helper class
+  """
+
+  TABLE_NAME = "RouteStops"
+  CREATE_STMTS = [
+    """
+      CREATE TABLE `RouteStops` (
+        `RouteId` char(50) NOT NULL,
+        `StopName` char(200) NOT NULL,
+        PRIMARY KEY(`RouteId`, `StopName`)
+      );
+    """,
+    "CREATE INDEX ixRouteId ON `RouteStops`(`RouteId`);",
+    "CREATE INDEX ixStopName ON `RouteStops`(`StopName`);"
+  ]
+
+  @staticmethod
+  def insert_values(conn, rows):
+    conn.execute("DROP TABLE IF EXISTS temp_RouteStops;")
+    sql = """
+      CREATE TEMPORARY TABLE temp_RouteStops(
+        RouteId VARCHAR(500),
+        StopName VARCHAR(500)
+      );
+    """
+    conn.execute(sql)
+    for r in rows:
+      sql = "INSERT INTO temp_RouteStops VALUES(%s, %s);"
+      conn.execute(sql, tuple(x for x in r))
+
+    sql = """
+      INSERT INTO RouteStops
+      SELECT UPD.*
+      FROM temp_RouteStops UPD
+        LEFT JOIN RouteStops T
+          ON UPD.RouteId = T.RouteId AND UPD.StopName = T.StopName
+      WHERE T.RouteId IS NULL;
+    """
+    conn.execute(sql)

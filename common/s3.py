@@ -34,6 +34,16 @@ class S3Mgr:
     self._Res.Object(self.bucketName, objKey).delete()
 
 
+  def delete_prefix(self, prefix):
+    """Deletes all keys under a given prefix
+
+    Args:
+      prefix: the common prefix for keys to remove
+    """
+    for key in self.fetch_keys(prefix):
+      self.delete_key(key)
+
+
   def move_key(self, objKey, nObjKey):
     """Renames/Moves a key
 

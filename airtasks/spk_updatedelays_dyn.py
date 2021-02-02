@@ -5,14 +5,15 @@ and update the VPDelays and HlyDelays tables
 # pylint: disable=cell-var-from-loop
 
 import os
-from datetime import datetime, timedelta
+import time
+from datetime import datetime, timedelta, date
 from collections import namedtuple
 
 import pytz
 import tzlocal
 from pyspark.sql import functions as F
 from pyspark.sql import SparkSession
-from pyspark.sql.types import StructType, StructField
+from pyspark.sql.types import ArrayType, StructType, StructField
 from pyspark.sql.types import StringType, DoubleType, IntegerType, \
   DateType, TimestampType, BooleanType
 from third_party.transitfeed import shapelib
@@ -128,13 +129,13 @@ class VPDelaysCalculator:
               pytz.exceptions.NonExistentTimeError):
         continue
       stopTimeLst.append(dict(
-          tripId=stopTimeRec[0],
-          stopId=stopTimeRec[1],
-          stopSeq=stopTimeRec[3],
-          stopName=stopTimeRec[4],
-          routeId=stopTimeRec[8],
-          coords=shapelib.Point.FromLatLng(stopTimeRec[6], stopTimeRec[7]),
-          schedDT=dt.replace(tzinfo=None)
+        tripId=stopTimeRec[0],
+        stopId=stopTimeRec[1],
+        stopSeq=stopTimeRec[3],
+        stopName=stopTimeRec[4],
+        routeId=stopTimeRec[8],
+        coords=shapelib.Point.FromLatLng(stopTimeRec[6], stopTimeRec[7]),
+        schedDT=dt.replace(tzinfo=None)
       ))
 
     vehPosLst = []
@@ -249,8 +250,8 @@ class HlyDelaysCalculator:
     )
     dfResult = self.dfVPDelays \
       .withColumn(
-          "datehour",
-          udf_datetime_to_datehour(self.dfVPDelays.SchedDT)
+        "datehour",
+        udf_datetime_to_datehour(self.dfVPDelays.SchedDT)
       )
     dfResult = dfResult.filter("EstDist < 100")
     dfResult = dfResult \
@@ -259,16 +260,16 @@ class HlyDelaysCalculator:
       .drop("datehour")
     dfResult = dfResult \
       .groupBy(
-          dfResult.DateEST, dfResult.HourEST,
-          dfResult.RouteId, dfResult.StopName
+        dfResult.DateEST, dfResult.HourEST,
+        dfResult.RouteId, dfResult.StopName
       ) \
       .agg(
-            F.mean(dfResult.EstDelay).alias("AvgDelay"),
-            F.mean(dfResult.EstDist).alias("AvgDist"),
-            F.count(F.lit(1)).alias("Cnt"),
-            F.first(dfResult.StopLat).alias("StopLat"),
-            F.first(dfResult.StopLon).alias("StopLon"),
-            F.first(dfResult.StopId).alias("StopId")
+        F.mean(dfResult.EstDelay).alias("AvgDelay"),
+        F.mean(dfResult.EstDist).alias("AvgDist"),
+        F.count(F.lit(1)).alias("Cnt"),
+        F.first(dfResult.StopLat).alias("StopLat"),
+        F.first(dfResult.StopLon).alias("StopLon"),
+        F.first(dfResult.StopId).alias("StopId")
       )
 
     return dfResult
@@ -281,14 +282,15 @@ class HlyDelaysCalculator:
 
     dfResult = dfHlyDelays \
       .groupBy(
-          dfHlyDelays.DateEST, dfHlyDelays.HourEST, dfHlyDelays.RouteId
+        dfHlyDelays.DateEST, dfHlyDelays.HourEST, dfHlyDelays.RouteId
       ) \
       .agg(
-          (F.sum(dfHlyDelays.AvgDelay * dfHlyDelays.Cnt) /
-           F.sum(dfHlyDelays.Cnt)).alias("AvgDelay"),
-          (F.sum(dfHlyDelays.AvgDist * dfHlyDelays.Cnt) /
-           F.sum(dfHlyDelays.Cnt)).alias("AvgDist"),
-          F.sum(dfHlyDelays.Cnt).alias("Cnt"))
+        (F.sum(dfHlyDelays.AvgDelay * dfHlyDelays.Cnt) /
+          F.sum(dfHlyDelays.Cnt)).alias("AvgDelay"),
+        (F.sum(dfHlyDelays.AvgDist * dfHlyDelays.Cnt) /
+          F.sum(dfHlyDelays.Cnt)).alias("AvgDist"),
+        F.sum(dfHlyDelays.Cnt).alias("Cnt")
+      )
     return dfResult
 
 
@@ -299,17 +301,17 @@ class HlyDelaysCalculator:
 
     dfResult = dfHlyDelays \
       .groupBy(
-          dfHlyDelays.DateEST, dfHlyDelays.HourEST, dfHlyDelays.StopName
+        dfHlyDelays.DateEST, dfHlyDelays.HourEST, dfHlyDelays.StopName
       ) \
       .agg(
-          (F.sum(dfHlyDelays.AvgDelay * dfHlyDelays.Cnt) /
-           F.sum(dfHlyDelays.Cnt)).alias("AvgDelay"),
-          (F.sum(dfHlyDelays.AvgDist * dfHlyDelays.Cnt) /
-           F.sum(dfHlyDelays.Cnt)).alias("AvgDist"),
-          F.sum(dfHlyDelays.Cnt).alias("Cnt"),
-          F.first(dfHlyDelays.StopLat).alias("StopLat"),
-          F.first(dfHlyDelays.StopLon).alias("StopLon"),
-          F.first(dfHlyDelays.StopId).alias("StopId")
+        (F.sum(dfHlyDelays.AvgDelay * dfHlyDelays.Cnt) /
+          F.sum(dfHlyDelays.Cnt)).alias("AvgDelay"),
+        (F.sum(dfHlyDelays.AvgDist * dfHlyDelays.Cnt) /
+          F.sum(dfHlyDelays.Cnt)).alias("AvgDist"),
+        F.sum(dfHlyDelays.Cnt).alias("Cnt"),
+        F.first(dfHlyDelays.StopLat).alias("StopLat"),
+        F.first(dfHlyDelays.StopLon).alias("StopLon"),
+        F.first(dfHlyDelays.StopId).alias("StopId")
       )
     return dfResult
 
@@ -321,35 +323,66 @@ class HlyDelaysCalculator:
 
     dfResult = dfHlyDelays \
       .groupBy(
-          dfHlyDelays.DateEST, dfHlyDelays.HourEST
+        dfHlyDelays.DateEST, dfHlyDelays.HourEST
       ) \
       .agg(
-          (F.sum(dfHlyDelays.AvgDelay * dfHlyDelays.Cnt) /
-           F.sum(dfHlyDelays.Cnt)).alias("AvgDelay"),
-          (F.sum(dfHlyDelays.AvgDist * dfHlyDelays.Cnt) /
-           F.sum(dfHlyDelays.Cnt)).alias("AvgDist"),
-          F.sum(dfHlyDelays.Cnt).alias("Cnt")
+        (F.sum(dfHlyDelays.AvgDelay * dfHlyDelays.Cnt) /
+          F.sum(dfHlyDelays.Cnt)).alias("AvgDelay"),
+        (F.sum(dfHlyDelays.AvgDist * dfHlyDelays.Cnt) /
+          F.sum(dfHlyDelays.Cnt)).alias("AvgDist"),
+        F.sum(dfHlyDelays.Cnt).alias("Cnt")
       )
     return dfResult
 
 
-  def update_db(self, dfHlyDelays, pqDate, noRouteVal=None):
-    """Saves a delays dataframe to the database table HlyDelays
+  def update_s3(self, dfHlyDelays, pqDate):
+    """Saves a delays dataframe to the S3 in parquet
     """
 
-    dfHlyDelays.foreachPartition(lambda rows:
-        HlyDelaysCalculator._push_hlydelays_dbtpls(rows, pqDate, noRouteVal)
+    s3Mgr = s3.S3Mgr()
+    pfx = f"HlyDelays/{pqDate.strftime('%Y%m%d.pq')}"
+    if s3Mgr.prefix_exists(pfx):
+      s3Mgr.delete_prefix(pfx)
+      time.sleep(5)
+
+    dfHlyDelays = dfHlyDelays \
+      .withColumn(
+        'route_stop',
+        F.concat(
+          dfHlyDelays.RouteId, F.lit(':::'),
+          F.lit('['), dfHlyDelays.StopName, F.lit(']')
+        )
+      )
+    dfHlyDelays = dfHlyDelays \
+      .groupBy(dfHlyDelays.route_stop) \
+      .agg(
+        F.collect_list(
+          F.struct(
+            dfHlyDelays.DateEST, dfHlyDelays.HourEST,
+            dfHlyDelays.AvgDelay, dfHlyDelays.AvgDist, dfHlyDelays.Cnt
+          )
+        ).alias('vals_unsorted')
+      )
+
+    udf_ret_type = ArrayType(StructType([
+      StructField("DateEST", DateType(), False),
+      StructField("HourEST", IntegerType(), False),
+      StructField("AvgDelay", DoubleType(), False),
+      StructField("AvgDist", DoubleType(), False),
+      StructField("Cnt", IntegerType(), False)
+    ]))
+    udf_sort_vals = F.udf(lambda vals:
+      list(sorted(vals, key=lambda r: (r.DateEST, r.HourEST))),
+      udf_ret_type
     )
+    dfHlyDelays = dfHlyDelays \
+      .withColumn('vals', udf_sort_vals(dfHlyDelays.vals_unsorted)) \
+      .drop('vals_unsorted')
 
+    dfHlyDelays.printSchema()
 
-  @staticmethod
-  def _push_hlydelays_dbtpls(rows, pqDate, noRouteVal):
-    with DBConn() as conn:
-      for row in rows:
-        dbtables.HlyDelays.insert_row(conn, row, pqDate, noRouteVal)
-        if conn.uncommited % 1000 == 0:
-          conn.commit()
-      conn.commit()
+    s3_path = "s3a://%s/%s" % (Settings.S3BucketName, pfx)
+    dfHlyDelays.write.mode("overwrite").parquet(s3_path)
 
 
 class GTFSFetcher:
@@ -469,6 +502,48 @@ def read_vp_parquet(spark, targetDate):
   return ret
 
 
+def run_dbg(spark):
+  log = utils.get_logger()
+
+  with DBConnCommonQueries() as conn:
+    dbtables.create_if_not_exists(conn, dbtables.HlyDelays)
+
+  feedDescs = GTFSFetcher.read_feed_descs()
+  curFeedDesc = None
+  dfStopTimes = None
+  feedRequiredFiles = ["stops.txt", "stop_times.txt", "trips.txt"]
+
+  gtfsFetcher = GTFSFetcher(spark)
+  targetDate = date(2020, 7, 10)
+  for fd in feedDescs:
+    if fd.includes_date(targetDate) and fd.includes_files(feedRequiredFiles):
+      curFeedDesc = fd
+  dfStopTimes = gtfsFetcher.read_stop_times(curFeedDesc)
+
+  s3Mgr = s3.S3Mgr()
+  dbg_data_s3_path = 'temp/spk_updatedelays_dyn_pq'
+  if not s3Mgr.prefix_exists(dbg_data_s3_path):
+    dfVehPos = read_vp_parquet(spark, targetDate)
+
+    calcVPDelays = \
+      VPDelaysCalculator(spark, targetDate, dfStopTimes, dfVehPos)
+    dfVPDelays = calcVPDelays.create_result_df()
+    dfVPDelays = dfVPDelays.where(dfVPDelays.RouteId == 'Red')
+    log.info(dfVPDelays.count())
+
+    calcHlyDelays = HlyDelaysCalculator(spark, dfVPDelays)
+    dfHlyDelays = calcHlyDelays.create_result_df()
+
+    pqKey = f"s3a://{Settings.S3BucketName}/{dbg_data_s3_path}"
+    dfHlyDelays.write.format("parquet").mode("overwrite").save(pqKey)
+  else:
+    pqKey = f"s3a://{Settings.S3BucketName}/{dbg_data_s3_path}"
+    dfHlyDelays = spark.read.parquet(pqKey)
+
+  calcHlyDelays = HlyDelaysCalculator(spark, None)
+  calcHlyDelays.update_s3(dfHlyDelays, targetDate)
+
+
 def run(spark):
   """Combines GTFS schedule feed with vehicle positions Parquet files
   and updates the VPDelays and HlyDelays tables
@@ -480,7 +555,6 @@ def run(spark):
   log = utils.get_logger()
 
   with DBConnCommonQueries() as conn:
-    dbtables.create_if_not_exists(conn, dbtables.VPDelays)
     dbtables.create_if_not_exists(conn, dbtables.HlyDelays)
 
   feedDescs = GTFSFetcher.read_feed_descs()
@@ -491,7 +565,7 @@ def run(spark):
   gtfsFetcher = GTFSFetcher(spark)
   with DBConn() as conn:
     entriesToProcess = dbtables.PqDates \
-      .select_pqdates_not_in_delays(conn, 'NOT IsInHlyDelays')
+      .select_pqdates_not_in_delays(conn, 'NOT IsInHlyDelaysS3')
   for targetDate in entriesToProcess:
     if dfStopTimes is None or not curFeedDesc.includes_date(targetDate):
       curFeedDesc = None
@@ -514,32 +588,53 @@ def run(spark):
         VPDelaysCalculator(spark, targetDate, dfStopTimes, dfVehPos)
       dfVPDelays = calcVPDelays.create_result_df()
 
+      cols_order = [
+        'RouteId', 'StopName', 'DateEST', 'HourEST',
+        'AvgDelay', 'AvgDist', 'Cnt'
+      ]
       calcHlyDelays = HlyDelaysCalculator(spark, dfVPDelays)
       dfHlyDelays = calcHlyDelays.create_result_df().persist()
-      dfGrpRoutes = calcHlyDelays.group_routes(dfHlyDelays)
-      dfGrpStops = calcHlyDelays.group_stops(dfHlyDelays)
-      dfGrpAll = calcHlyDelays.group_all(dfHlyDelays)
+      dfGrpRoutes = calcHlyDelays.group_routes(dfHlyDelays) \
+        .withColumn('StopName', F.lit('ALLSTOPS'))
+      dfGrpStops = calcHlyDelays.group_stops(dfHlyDelays) \
+        .withColumn('RouteId', F.lit('ALLROUTES'))
+      dfGrpAll = calcHlyDelays.group_all(dfHlyDelays) \
+        .withColumn('RouteId', F.lit('ALLROUTES')) \
+        .withColumn('StopName', F.lit('ALLSTOPS'))
       dfHlyDelaysBus = dfHlyDelays.filter(dfHlyDelays.RouteId.rlike("^[0-9]"))
       dfHlyDelaysTrain = dfHlyDelays.filter(~dfHlyDelays.RouteId.rlike("^[0-9]"))
-      dfGrpStopsBus = calcHlyDelays.group_stops(dfHlyDelaysBus)
-      dfGrpAllBus = calcHlyDelays.group_all(dfHlyDelaysBus)
-      dfGrpStopsTrain = calcHlyDelays.group_stops(dfHlyDelaysTrain)
-      dfGrpAllTrain = calcHlyDelays.group_all(dfHlyDelaysTrain)
+      dfGrpStopsBus = calcHlyDelays.group_stops(dfHlyDelaysBus) \
+        .withColumn('RouteId', F.lit('ALLBUSES'))
+      dfGrpAllBus = calcHlyDelays.group_all(dfHlyDelaysBus) \
+        .withColumn('RouteId', F.lit('ALLBUSES')) \
+        .withColumn('StopName', F.lit('ALLSTOPS'))
+      dfGrpStopsTrain = calcHlyDelays.group_stops(dfHlyDelaysTrain) \
+        .withColumn('RouteId', F.lit('ALLTRAINS'))
+      dfGrpAllTrain = calcHlyDelays.group_all(dfHlyDelaysTrain) \
+        .withColumn('RouteId', F.lit('ALLTRAINS')) \
+        .withColumn('StopName', F.lit('ALLSTOPS'))
 
-      with DBConn() as conn:
-        dbtables.HlyDelays.delete_for_parquet(conn, targetDate)
+      with DBConnCommonQueries() as conn:
+        dbtables.create_if_not_exists(conn, dbtables.RouteStops)
+        data = dfHlyDelays[['RouteId', 'StopName']] \
+          .distinct() \
+          .collect()
+        dbtables.RouteStops.insert_values(conn, data)
         conn.commit()
 
-      calcHlyDelays.update_db(dfHlyDelays, targetDate)
-      calcHlyDelays.update_db(dfGrpRoutes, targetDate)
-      calcHlyDelays.update_db(dfGrpStops, targetDate)
-      calcHlyDelays.update_db(dfGrpAll, targetDate)
-      calcHlyDelays.update_db(dfGrpStopsBus, targetDate, "ALLBUSES")
-      calcHlyDelays.update_db(dfGrpAllBus, targetDate, "ALLBUSES")
-      calcHlyDelays.update_db(dfGrpStopsTrain, targetDate, "ALLTRAINS")
-      calcHlyDelays.update_db(dfGrpAllTrain, targetDate, "ALLTRAINS")
+      dfAllHly = dfHlyDelays[cols_order] \
+        .union(dfGrpRoutes[cols_order]) \
+        .union(dfGrpStops[cols_order]) \
+        .union(dfGrpAll[cols_order]) \
+        .union(dfGrpStopsBus[cols_order]) \
+        .union(dfGrpAllBus[cols_order]) \
+        .union(dfGrpStopsTrain[cols_order]) \
+        .union(dfGrpAllTrain[cols_order])
+
+      calcHlyDelays.update_s3(dfAllHly, targetDate)
+
       with DBConn() as conn:
-        dbtables.PqDates.update_in_delays(conn, targetDate, "IsInHlyDelays")
+        dbtables.PqDates.update_in_delays(conn, targetDate, "IsInHlyDelaysS3")
         conn.commit()
 
 
@@ -547,15 +642,16 @@ if __name__ == "__main__":
   builder = SparkSession.builder
   for envVar in credentials.EnvVars:
     try:
-      val = os.environ[envVar]
+      envVal = os.environ[envVar]
       confKey = "spark.executorEnv.%s" % envVar
-      builder = builder.config(confKey, val)
+      builder = builder.config(confKey, envVal)
     except KeyError:
       continue
-  appName = "UpdateDelays"
+  appName = "UpdateDelaysDyn"
   sparkSession = builder \
     .appName(appName) \
     .getOrCreate()
+  # sparkSession.sparkContext.setLogLevel('info')
 
   run(sparkSession)
 

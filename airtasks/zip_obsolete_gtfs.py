@@ -5,9 +5,12 @@ import tarfile
 from io import BytesIO
 
 from common.queryutils import DBConn
+from common import utils
 from common import Settings, s3, gtfs, dbtables
 
 __author__ = "Alex Ganin"
+
+logger = utils.get_logger()
 
 
 def archive_gtfs_files(s3Mgr, feedDesc):
@@ -24,6 +27,7 @@ def archive_gtfs_files(s3Mgr, feedDesc):
   objKeys = s3Mgr.fetch_keys(pfx)
   if not objKeys:
     return False
+  logger.info('Proceeding with %s' % feedDesc.s3Key)
   buffer = BytesIO()
   tbz2 = tarfile.open(mode="w:bz2", fileobj=buffer)
   for objKey in objKeys:
@@ -53,10 +57,10 @@ def main():
   feedDescs = gtfs.read_feed_descs(content)
 
   with DBConn() as conn:
-    dtNow = dbtables.PqDates \
-      .select_latest_processed(conn, Settings.InsertVPDelays)
+    dtNow = dbtables.PqDates.select_latest_processed(conn)
   if not dtNow:
     return
+  logger.info('Latest processed parquet date is %s' % str(dtNow))
 
   for fd in feedDescs:
     daysDiff = (dtNow - fd.endDate).total_seconds() / (24 * 3600)
