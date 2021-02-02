@@ -26,6 +26,7 @@
       "--disable=unused-argument",
       "--disable=stop-iteration-return",
       "--disable=bad-continuation",
+      "--disable=logging-not-lazy",
       "--disable=logging-format-interpolation",
       "--disable=fixme",
       "--indent-string='  '"
