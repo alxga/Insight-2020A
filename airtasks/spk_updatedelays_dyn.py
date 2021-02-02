@@ -347,7 +347,10 @@ class HlyDelaysCalculator:
     dfHlyDelays = dfHlyDelays \
       .withColumn(
         'route_stop',
-        F.concat(dfHlyDelays.RouteId, F.lit(':::'), dfHlyDelays.StopId)
+        F.concat(
+          dfHlyDelays.RouteId, F.lit(':::'),
+          F.lit('['), dfHlyDelays.StopName, F.lit(']')
+        )
       )
     dfHlyDelays = dfHlyDelays \
       .groupBy(dfHlyDelays.route_stop) \
@@ -378,24 +381,6 @@ class HlyDelaysCalculator:
 
     s3_path = "s3a://%s/%s" % (Settings.S3BucketName, pfx)
     dfHlyDelays.write.mode("overwrite").parquet(s3_path)
-
-  def update_db(self, dfHlyDelays, pqDate, noRouteVal=None):
-    """Saves a delays dataframe to the database table HlyDelays
-    """
-
-    dfHlyDelays.foreachPartition(lambda rows:
-        HlyDelaysCalculator._push_hlydelays_dbtpls(rows, pqDate, noRouteVal)
-    )
-
-
-  @staticmethod
-  def _push_hlydelays_dbtpls(rows, pqDate, noRouteVal):
-    with DBConn() as conn:
-      for row in rows:
-        dbtables.HlyDelays.insert_row(conn, row, pqDate, noRouteVal)
-        if conn.uncommited % 1000 == 0:
-          conn.commit()
-      conn.commit()
 
 
 class GTFSFetcher:
@@ -603,28 +588,36 @@ def run(spark):
         VPDelaysCalculator(spark, targetDate, dfStopTimes, dfVehPos)
       dfVPDelays = calcVPDelays.create_result_df()
 
-      cols_order = ['RouteId', 'StopId', 'HourEST', 'AvgDelay', 'AvgDist', 'Cnt']
+      cols_order = ['RouteId', 'StopName', 'HourEST', 'AvgDelay', 'AvgDist', 'Cnt']
       calcHlyDelays = HlyDelaysCalculator(spark, dfVPDelays)
       dfHlyDelays = calcHlyDelays.create_result_df().persist()
       dfGrpRoutes = calcHlyDelays.group_routes(dfHlyDelays) \
-        .withColumn('StopId', F.lit('ALLSTOPS'))
+        .withColumn('StopName', F.lit('ALLSTOPS'))
       dfGrpStops = calcHlyDelays.group_stops(dfHlyDelays) \
         .withColumn('RouteId', F.lit('ALLROUTES'))
       dfGrpAll = calcHlyDelays.group_all(dfHlyDelays) \
         .withColumn('RouteId', F.lit('ALLROUTES')) \
-        .withColumn('StopId', F.lit('ALLSTOPS'))
+        .withColumn('StopName', F.lit('ALLSTOPS'))
       dfHlyDelaysBus = dfHlyDelays.filter(dfHlyDelays.RouteId.rlike("^[0-9]"))
       dfHlyDelaysTrain = dfHlyDelays.filter(~dfHlyDelays.RouteId.rlike("^[0-9]"))
       dfGrpStopsBus = calcHlyDelays.group_stops(dfHlyDelaysBus) \
         .withColumn('RouteId', F.lit('ALLBUSES'))
       dfGrpAllBus = calcHlyDelays.group_all(dfHlyDelaysBus) \
         .withColumn('RouteId', F.lit('ALLBUSES')) \
-        .withColumn('StopId', F.lit('ALLSTOPS'))
+        .withColumn('StopName', F.lit('ALLSTOPS'))
       dfGrpStopsTrain = calcHlyDelays.group_stops(dfHlyDelaysTrain) \
         .withColumn('RouteId', F.lit('ALLTRAINS'))
       dfGrpAllTrain = calcHlyDelays.group_all(dfHlyDelaysTrain) \
         .withColumn('RouteId', F.lit('ALLTRAINS')) \
-        .withColumn('StopId', F.lit('ALLSTOPS'))
+        .withColumn('StopName', F.lit('ALLSTOPS'))
+
+      with DBConnCommonQueries() as conn:
+        dbtables.create_if_not_exists(conn, dbtables.RouteStops)
+        data = dfHlyDelays[['RouteId', 'StopName']] \
+          .distinct() \
+          .collect()
+        dbtables.RouteStops.insert_values(conn, data)
+        conn.commit()
 
       dfAllHly = dfHlyDelays[cols_order] \
         .union(dfGrpRoutes[cols_order]) \

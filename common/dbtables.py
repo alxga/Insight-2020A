@@ -14,7 +14,11 @@ def create_if_not_exists(conn, cls):
   """
 
   if not conn.table_exists(cls.TABLE_NAME):
-    conn.execute(cls.CREATE_STMT)
+    if 'CREATE_STMT' in cls.__dict__:
+      conn.execute(cls.CREATE_STMT)
+    if 'CREATE_STMTS' in cls.__dict__:
+      for stmt in cls.CREATE_STMTS:
+        conn.execute(stmt)
     conn.commit()
 
 
@@ -284,8 +288,7 @@ class PqDates:
       `D` Date PRIMARY KEY,
       `NumKeys` integer NOT NULL,
       `NumRecs` integer NOT NULL,
-      `IsInHlyDelays` tinyint(1) DEFAULT '0',
-      `IsInDynamo` tinyint(1) DEFAULT '0'
+      `IsInHlyDelays` tinyint(1) DEFAULT '0'
     );
   """
 
@@ -339,7 +342,7 @@ class PqDates:
     sqlStmt = """
       SELECT max(D) FROM `PqDates`
       WHERE NumRecs > 0 and IsInHlyDelays;
-    """ % whFlags
+    """
     cur = conn.execute(sqlStmt)
     try:
       row = next(cur)
@@ -517,3 +520,45 @@ class HlyDelays:
       DELETE FROM `HlyDelays` WHERE D = '%s';
     """ % D.strftime("%Y-%m-%d")
     conn.execute(sqlStmt)
+
+
+class RouteStops:
+  """DynKeys table helper class
+  """
+
+  TABLE_NAME = "RouteStops"
+  CREATE_STMTS = [
+    """
+      CREATE TABLE `RouteStops` (
+        `RouteId` char(50) NOT NULL,
+        `StopName` char(200) NOT NULL,
+        PRIMARY KEY(`RouteId`, `StopName`)
+      );
+    """,
+    "CREATE INDEX ixRouteId ON `RouteStops`(`RouteId`);",
+    "CREATE INDEX ixStopName ON `RouteStops`(`StopName`);"
+  ]
+
+  @staticmethod
+  def insert_values(conn, rows):
+    conn.execute("DROP TABLE IF EXISTS temp_RouteStops;")
+    sql = """
+      CREATE TEMPORARY TABLE temp_RouteStops(
+        RouteId VARCHAR(500),
+        StopName VARCHAR(500)
+      );
+    """
+    conn.execute(sql)
+    for r in rows:
+      sql = "INSERT INTO temp_RouteStops VALUES(%s, %s);"
+      conn.execute(sql, tuple(x for x in r))
+
+    sql = """
+      INSERT INTO RouteStops
+      SELECT UPD.*
+      FROM temp_RouteStops UPD
+        LEFT JOIN RouteStops T
+          ON UPD.RouteId = T.RouteId AND UPD.StopName = T.StopName
+      WHERE T.RouteId IS NULL;
+    """
+    conn.execute(sql)

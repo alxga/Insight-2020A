@@ -6,8 +6,11 @@ import pandas as pd
 import boto3.dynamodb.types as dyndbtypes
 
 from common import s3, dyndb, Settings
+from common import utils
 
 __author__ = "Alex Ganin"
+
+logger = utils.get_logger()
 
 
 def _process_df(df, pqDate):
@@ -34,7 +37,7 @@ def _process_df(df, pqDate):
 
 
 def _process_pqdate(pqDate):
-  s3_prefix = f"{pqDate.strftime('%Y%m%d')}.pq"
+  s3_prefix = f"HlyDelays/{pqDate.strftime('%Y%m%d')}.pq"
   rexpr = re.compile(r'.*part-.*\.parquet$')
   s3Mgr = s3.S3Mgr()
   for key in s3Mgr.fetch_keys(s3_prefix):
@@ -42,12 +45,19 @@ def _process_pqdate(pqDate):
       key = f's3://{Settings.S3BucketName}/{key}'
       df = pd.read_parquet(key)
       _process_df(df, pqDate)
+      logger.info(f'Processed entries from {key}')
+
 
 def main():
   """Checks for feed updates on the MBTA website and saves any updates to S3
   """
 
-  _process_pqdate(date(2020, 7, 10))
+  tg_dates = [
+    date(2020, 7, 10), date(2020, 7, 11), date(2020, 7, 12),
+    date(2020, 7, 13), date(2020, 7, 14)
+  ]
+  for dt in tg_dates:
+    _process_pqdate(dt)
 
 if __name__ == "__main__":
   main()
