@@ -1,5 +1,6 @@
 """Script to zip MBTA schedule in S3 to save space"""
 
+import re
 import tarfile
 
 from io import BytesIO
@@ -68,5 +69,31 @@ def main():
       archive_gtfs_files(s3Mgr, fd)
 
 
+def _rollback_2020():
+  s3Mgr = s3.S3Mgr()
+  seasons = ['Winter', 'Spring', 'Summer', 'Fall']
+  pfxs20 = [x + ' 2020' for x in seasons]
+  pfx20_lens = [len(x) for x in pfxs20]
+  for objKey in s3Mgr.fetch_keys('GTFS_Archived'):
+    m = re.match(r'GTFS_Archived/(?P<feedname>.*)\.tar.bz2', objKey)
+    if not m:
+      continue
+    feedname = m['feedname']
+    for pfx, pfx_len in zip(pfxs20, pfx20_lens):
+      if feedname[0:pfx_len] == pfx:
+        logger.info(f'Proceeding with {objKey}')
+        data = s3Mgr.fetch_object_body(objKey)
+        buffer = BytesIO(data)
+        tbz2 = tarfile.open(mode="r:bz2", fileobj=buffer)
+        for member in tbz2.getmembers():
+          extr_key = '/'.join(['GTFS', feedname, member.name])
+          if s3Mgr.prefix_exists(extr_key):
+            logger.warning(f'Prefix {extr_key} already exists')
+            continue
+          s3Mgr.put_object_body(extr_key, tbz2.extractfile(member).read())
+        s3Mgr.delete_key(objKey)
+
+
 if __name__ == "__main__":
   main()
+  # _rollback_2020()

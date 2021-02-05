@@ -159,24 +159,27 @@ class VPDelaysCalculator:
 
       curClosest = None
       curDist = 1e10
+      curSchedDT = None
       for vp in vehPosLst:
         dist = stopCoords.GetDistanceMeters(vp.coords)
         if dist < curDist:
-          curDist = dist
-          curClosest = vp
+          # adjust the scheduled time for possible date mismatches
+          schedDT = stopTime["schedDT"]
+          daysDiff = round((schedDT - vp.DT).total_seconds() / (24 * 3600))
+          schedDT -= timedelta(days=daysDiff)
+          # ignore datapoints where the absolute value of delay is too large
+          if -2400 < (vp.DT - schedDT).total_seconds() < 2400:
+            curDist = dist
+            curClosest = vp
+            curSchedDT = schedDT
 
-      # adjust the scheduled time for possible date mismatches
-      schedDT = stopTime["schedDT"]
-      daysDiff = round((schedDT - curClosest.DT).total_seconds() / (24 * 3600))
-      schedDT -= timedelta(days=daysDiff)
-
-      if cutoffs[0] < schedDT < cutoffs[1]:
+      if curClosest and cutoffs[0] < schedDT < cutoffs[1]:
         vpLatLon = curClosest.coords.ToLatLng()
         ret.append((
             stopTime["routeId"], stopTime["tripId"], stopTime["stopId"],
-            stopTime["stopName"], stopLatLon[0], stopLatLon[1], schedDT,
+            stopTime["stopName"], stopLatLon[0], stopLatLon[1], curSchedDT,
             vpLatLon[0], vpLatLon[1], curClosest.DT, curDist,
-            (curClosest.DT - schedDT).total_seconds()
+            (curClosest.DT - curSchedDT).total_seconds()
         ))
     return ret
 
