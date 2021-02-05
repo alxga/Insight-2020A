@@ -520,7 +520,7 @@ class HlyDelays:
 
 
 class RouteStops:
-  """DynKeys table helper class
+  """RouteStops table helper class
   """
 
   TABLE_NAME = "RouteStops"
@@ -535,6 +535,11 @@ class RouteStops:
     "CREATE INDEX ixRouteId ON `RouteStops`(`RouteId`);",
     "CREATE INDEX ixStopName ON `RouteStops`(`StopName`);"
   ]
+
+  @staticmethod
+  def select_all(conn):
+    sql = "SELECT RouteId, StopName FROM RouteStops;"
+    return list(conn.execute(sql))
 
   @staticmethod
   def insert_values(conn, rows):
@@ -559,3 +564,34 @@ class RouteStops:
       WHERE T.RouteId IS NULL;
     """
     conn.execute(sql)
+
+
+class PqDateDynKeys:
+  """DynPqDateKeys table helper class
+  """
+
+  TABLE_NAME = "PqDateDynKeys"
+  CREATE_STMTS = [
+    """
+      CREATE TABLE `PqDateDynKeys` (
+        `D` date NOT NULL,
+        `DynTable` char(100) NOT NULL,
+        `PrtnKey` varchar(400) NOT NULL,
+        `SortKey` char(100) NOT NULL,
+        `RouteId` char(50) NOT NULL,
+        `StopName` char(200) NOT NULL,
+        PRIMARY KEY(`DynTable`, `PrtnKey`, `SortKey`)
+      );
+    """,
+    "CREATE INDEX ixD ON `PqDateDynKeys`(`D`);"
+  ]
+
+  @staticmethod
+  def insert_row(
+    conn, pqDate, dyn_table, part_key, sort_key, route_id, stop_name
+  ):
+    sql = """
+      INSERT IGNORE INTO PqDateDynKeys VALUES(%s, %s, %s, %s, %s, %s);
+    """
+    tpl = (pqDate, dyn_table, part_key, sort_key, route_id, stop_name)
+    conn.execute(sql, tpl)
