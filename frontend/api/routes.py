@@ -5,8 +5,9 @@ from flask import jsonify, request, Response
 
 from boto3.dynamodb.conditions import Key
 
+from common import Settings
 from common.queryutils import DBConn
-from common.dyndb import DynDBMgr, Settings
+from common.dyndb import DynDBMgr
 from .. import math
 from . import bp
 
