@@ -16,7 +16,8 @@ logger = utils.get_logger()
 
 def _process_df(df, pqDate):
   dynMgr = dyndb.DynDBMgr()
-  dynTbl = dynMgr.table('hlydelays')
+  mxdstr = '0' if Settings.MaxAbsDelay <= 0 else str(Settings.MaxAbsDelay)
+  dynTbl = dynMgr.table(f'hlydelays{mxdstr}')
 
   with DBConnCommonQueries() as rdsConn, \
        dynTbl.batch_writer() as dynWriter, \
@@ -48,7 +49,8 @@ def _process_df(df, pqDate):
 
 
 def _process_pqdate(pqDate):
-  s3_prefix = f"HlyDelays/{pqDate.strftime('%Y%m%d')}.pq"
+  mxdstr = '0' if Settings.MaxAbsDelay <= 0 else str(Settings.MaxAbsDelay)
+  s3_prefix = f"HlyDelays{mxdstr}/{pqDate.strftime('%Y%m%d')}.pq"
   rexpr = re.compile(r'.*part-.*\.parquet$')
   s3Mgr = s3.S3Mgr()
   for key in s3Mgr.fetch_keys(s3_prefix):
@@ -64,7 +66,8 @@ def _delete_for_pq_dates(pqDates):
     route_stops = dbtables.RouteStops.select_all(conn)
   prtn_keys = [f'{x[0]}:::[{x[1]}]' for x in route_stops]
   dynMgr = dyndb.DynDBMgr()
-  dynTbl = dynMgr.table('hlydelays')
+  mxdstr = '0' if Settings.MaxAbsDelay <= 0 else str(Settings.MaxAbsDelay)
+  dynTbl = dynMgr.table(f'hlydelays{mxdstr}')
   count = 0
   total = len(prtn_keys) * len(pqDates)
   with dynTbl.batch_writer() as dynWriter:

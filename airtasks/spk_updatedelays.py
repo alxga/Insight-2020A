@@ -151,6 +151,7 @@ class VPDelaysCalculator:
   @staticmethod
   def _calc_delays(cutoffs, stopTimeLst, vehPosLst):
     ret = []
+    mxdval = 1e10 if Settings.MaxAbsDelay <= 0 else Settings.MaxAbsDelay
 
     for stopTime in stopTimeLst:
       stopCoords = stopTime["coords"]
@@ -167,7 +168,7 @@ class VPDelaysCalculator:
           daysDiff = round((schedDT - vp.DT).total_seconds() / (24 * 3600))
           schedDT -= timedelta(days=daysDiff)
           # ignore datapoints where the absolute value of delay is too large
-          if -2400 < (vp.DT - schedDT).total_seconds() < 2400:
+          if -mxdval < (vp.DT - schedDT).total_seconds() < mxdval:
             curDist = dist
             curClosest = vp
             curSchedDT = schedDT

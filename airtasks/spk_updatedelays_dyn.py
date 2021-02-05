@@ -106,15 +106,6 @@ class VPDelaysCalculator:
     return self.spark.createDataFrame(rddVPDelays, self.TableSchema)
 
 
-  def update_db(self, dfVPDelays):
-    """Saves a delays dataframe to the database table VPDelays
-    """
-    pqDate = self.pqDate
-    dfVPDelays.foreachPartition(lambda rows:
-        VPDelaysCalculator._push_vpdelays_dbtpls(rows, pqDate)
-    )
-
-
   @staticmethod
   def _process_joined(pqDate, cutoffs, keyTpl1Tpl2):
     stopTimeRecs = keyTpl1Tpl2[1][0]
@@ -152,6 +143,7 @@ class VPDelaysCalculator:
   @staticmethod
   def _calc_delays(cutoffs, stopTimeLst, vehPosLst):
     ret = []
+    mxdval = 1e10 if Settings.MaxAbsDelay <= 0 else Settings.MaxAbsDelay
 
     for stopTime in stopTimeLst:
       stopCoords = stopTime["coords"]
@@ -168,7 +160,7 @@ class VPDelaysCalculator:
           daysDiff = round((schedDT - vp.DT).total_seconds() / (24 * 3600))
           schedDT -= timedelta(days=daysDiff)
           # ignore datapoints where the absolute value of delay is too large
-          if -2400 < (vp.DT - schedDT).total_seconds() < 2400:
+          if -mxdval < (vp.DT - schedDT).total_seconds() < mxdval:
             curDist = dist
             curClosest = vp
             curSchedDT = schedDT
@@ -182,16 +174,6 @@ class VPDelaysCalculator:
             (curClosest.DT - curSchedDT).total_seconds()
         ))
     return ret
-
-
-  @staticmethod
-  def _push_vpdelays_dbtpls(rows, pqDate):
-    with DBConn() as conn:
-      for row in rows:
-        dbtables.VPDelays.insert_row(conn, row, pqDate)
-        if conn.uncommited % 1000 == 0:
-          conn.commit()
-      conn.commit()
 
 
 class HlyDelaysCalculator:
@@ -343,7 +325,8 @@ class HlyDelaysCalculator:
     """
 
     s3Mgr = s3.S3Mgr()
-    pfx = f"HlyDelays/{pqDate.strftime('%Y%m%d.pq')}"
+    mxdstr = '0' if Settings.MaxAbsDelay <= 0 else str(Settings.MaxAbsDelay)
+    pfx = f"HlyDelays{mxdstr}/{pqDate.strftime('%Y%m%d.pq')}"
     if s3Mgr.prefix_exists(pfx):
       s3Mgr.delete_prefix(pfx)
       time.sleep(5)
@@ -503,48 +486,6 @@ def read_vp_parquet(spark, targetDate):
   )
   ret = ret.filter(udf_filter_for_pqdate(ret.DT))
   return ret
-
-
-def run_dbg(spark):
-  log = utils.get_logger()
-
-  with DBConnCommonQueries() as conn:
-    dbtables.create_if_not_exists(conn, dbtables.HlyDelays)
-
-  feedDescs = GTFSFetcher.read_feed_descs()
-  curFeedDesc = None
-  dfStopTimes = None
-  feedRequiredFiles = ["stops.txt", "stop_times.txt", "trips.txt"]
-
-  gtfsFetcher = GTFSFetcher(spark)
-  targetDate = date(2020, 7, 10)
-  for fd in feedDescs:
-    if fd.includes_date(targetDate) and fd.includes_files(feedRequiredFiles):
-      curFeedDesc = fd
-  dfStopTimes = gtfsFetcher.read_stop_times(curFeedDesc)
-
-  s3Mgr = s3.S3Mgr()
-  dbg_data_s3_path = 'temp/spk_updatedelays_dyn_pq'
-  if not s3Mgr.prefix_exists(dbg_data_s3_path):
-    dfVehPos = read_vp_parquet(spark, targetDate)
-
-    calcVPDelays = \
-      VPDelaysCalculator(spark, targetDate, dfStopTimes, dfVehPos)
-    dfVPDelays = calcVPDelays.create_result_df()
-    dfVPDelays = dfVPDelays.where(dfVPDelays.RouteId == 'Red')
-    log.info(dfVPDelays.count())
-
-    calcHlyDelays = HlyDelaysCalculator(spark, dfVPDelays)
-    dfHlyDelays = calcHlyDelays.create_result_df()
-
-    pqKey = f"s3a://{Settings.S3BucketName}/{dbg_data_s3_path}"
-    dfHlyDelays.write.format("parquet").mode("overwrite").save(pqKey)
-  else:
-    pqKey = f"s3a://{Settings.S3BucketName}/{dbg_data_s3_path}"
-    dfHlyDelays = spark.read.parquet(pqKey)
-
-  calcHlyDelays = HlyDelaysCalculator(spark, None)
-  calcHlyDelays.update_s3(dfHlyDelays, targetDate)
 
 
 def run(spark):

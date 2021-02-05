@@ -42,6 +42,8 @@ class Settings:
 
     self.MBTA_TZ = pytz.timezone("US/Eastern")
 
+    self.MaxAbsDelay = 3600
+
     self.GTFS_ObsoleteAfterDays = 10
 
     self.NumPartitions = 100

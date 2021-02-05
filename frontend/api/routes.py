@@ -6,7 +6,7 @@ from flask import jsonify, request, Response
 from boto3.dynamodb.conditions import Key
 
 from common.queryutils import DBConn
-from common.dyndb import DynDBMgr
+from common.dyndb import DynDBMgr, Settings
 from .. import math
 from . import bp
 
@@ -71,7 +71,8 @@ def query_delays_hourly(routeId, stopName):
     stopName = 'ALLSTOPS'
   dynKey = f'{routeId}:::[{stopName}]'
   dynDb = DynDBMgr()
-  dynTbl = dynDb.table('hlydelays')
+  mxdstr = '0' if Settings.MaxAbsDelay <= 0 else str(Settings.MaxAbsDelay)
+  dynTbl = dynDb.table(f'hlydelays{mxdstr}')
   response = dynTbl.query(
     KeyConditionExpression=Key('route_stop').eq(dynKey)
   )
