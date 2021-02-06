@@ -19,6 +19,8 @@ class Settings:
     PyVersion: major version of the Python interpreter (2 or 3)
     S3BucketName: S3 bucket name
     MBTA_TZ: time zone of MBTA GTFS feeds
+    MaxAbsDelay: maximum absolute value of valid delay calculation result,
+      if less than or equal to 0 then any value is considered valid
     GTFS_ObsoleteAfterDays: number of days between the latest delays
       calculation and the last day of a GTFS feed coverage for the feed to
       be considered obsolete and to be stored compressed in S3
@@ -42,7 +44,7 @@ class Settings:
 
     self.MBTA_TZ = pytz.timezone("US/Eastern")
 
-    self.MaxAbsDelay = 3600
+    self.MaxAbsDelay = 0
 
     self.GTFS_ObsoleteAfterDays = 10
 

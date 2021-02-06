@@ -6,7 +6,7 @@ and update the VPDelays and HlyDelays tables
 
 import os
 import time
-from datetime import datetime, timedelta, date
+from datetime import datetime, timedelta, date # pylint: disable=unused-import
 from collections import namedtuple
 
 import pytz
@@ -145,7 +145,8 @@ class VPDelaysCalculator:
     ret = []
     mxdval = 1e10 if Settings.MaxAbsDelay <= 0 else Settings.MaxAbsDelay
 
-    for stopTime in stopTimeLst:
+    prevEstDT = None
+    for stopTime in sorted(stopTimeLst, key=lambda x: x['schedDT']):
       stopCoords = stopTime["coords"]
       stopLatLon = stopCoords.ToLatLng()
 
@@ -173,6 +174,12 @@ class VPDelaysCalculator:
             vpLatLon[0], vpLatLon[1], curClosest.DT, curDist,
             (curClosest.DT - curSchedDT).total_seconds()
         ))
+
+        if prevEstDT:
+          diffWPrev = (curClosest.DT - prevEstDT).total_seconds()
+          if diffWPrev < -120:
+            return []
+        prevEstDT = curClosest.DT
     return ret
 
 
