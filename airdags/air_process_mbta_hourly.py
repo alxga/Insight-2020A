@@ -54,9 +54,9 @@ update_vehpos_pq = BashOperator(
 )
 
 update_delays = BashOperator(
-    task_id="update_delays",
+    task_id="update_delays_dyn",
     bash_command=(BashCmdPrefix +
-      "./myspark.sh airtasks/spk_updatedelays.py --on-master"),
+      "./myspark.sh airtasks/spk_updatedelays_dyn.py --on-master"),
     queue="sparks",
     dag=dag
 )
