@@ -6,16 +6,18 @@ from flask import jsonify, request, Response
 from boto3.dynamodb.conditions import Key
 
 from common import Settings
-from common.queryutils import DBConn
-from common.dyndb import DynDBMgr
+if not Settings.StaticDataPath:
+  from common.queryutils import DBConn
+  from common.dyndb import DynDBMgr
+else:
+  from ..staticdata import StaticData, CsvParser
 from .. import math
 from . import bp
 
 __author__ = "Alex Ganin"
 
 
-@bp.route('/routeids', methods=['GET'])
-def get_routeids():
+def _db_get_routeids():
   sqlStmt = """
     SELECT DISTINCT RouteId FROM RouteStops
     WHERE RouteId <> 'ALLROUTES' AND RouteId <> 'ALLTRAINS' AND
@@ -28,17 +30,24 @@ def get_routeids():
     for row in cur:
       if row[0]:
         ret.append(row[0])
+  return ret
+
+
+@bp.route('/routeids', methods=['GET'])
+def get_routeids():
+  if StaticData:
+    routes = StaticData['routes_dct']
+    excluded = {'ALLROUTES', 'ALLTRAINS', 'ALLBUSES'}
+    items = [x for x in sorted(routes.keys()) if x not in excluded]
+  else:
+    items = _db_get_routeids()
   data = {
-    "items": ret
+    "items": items
   }
   return jsonify(data)
 
 
-@bp.route('/stopnames', methods=['GET'])
-def get_stopnames():
-  routeId = request.args.get('routeId', None)
-  q = request.args.get('q', '').lower()
-
+def _get_stopnames_db(routeId, q):
   sqlStmt = """
     SELECT DISTINCT StopName FROM RouteStops
   """
@@ -59,17 +68,41 @@ def get_stopnames():
       stopNameLower = stopName.lower()
       if stopNameLower.startswith(q):
         ret.append(stopName)
+  return ret
+
+
+def _get_stopnames_static(routeId, q):
+  routes = StaticData['routes_dct']
+  if not routeId:
+    routeId = 'ALLROUTES'
+  if routeId not in routes:
+    return []
+  ret = []
+  for stopName in sorted(routes[routeId].keys()):
+    if stopName == 'ALLSTOPS':
+      continue
+    stopNameLower = stopName.lower()
+    if stopNameLower.startswith(q):
+      ret.append(stopName)
+  return ret
+
+
+@bp.route('/stopnames', methods=['GET'])
+def get_stopnames():
+  routeId = request.args.get('routeId', None)
+  q = request.args.get('q', '').lower()
+  if StaticData:
+    ret = _get_stopnames_static(routeId, q)
+  else:
+    ret = _get_stopnames_db(routeId, q)
+  
   data = {
     "items": ret
   }
   return jsonify(data)
 
 
-def query_delays_hourly(routeId, stopName):
-  if not routeId:
-    routeId = 'ALLROUTES'
-  if not stopName:
-    stopName = 'ALLSTOPS'
+def _get_delays_hourly_db(routeId, stopName):
   dynKey = f'{routeId}:::[{stopName}]'
   dynDb = DynDBMgr()
   mxdstr = '0' if Settings.MaxAbsDelay <= 0 else str(Settings.MaxAbsDelay)
@@ -87,6 +120,34 @@ def query_delays_hourly(routeId, stopName):
       recs.append(Record(
         val['DT_EST'], float(val['AvgDelay']), float(val['Cnt'])
       ))
+  return recs
+
+
+def _get_delays_hourly_static(routeId, stopName):
+  try:
+    csv_path = StaticData['routes_dct'][routeId][stopName]
+  except KeyError:
+    return []
+  parser = CsvParser()
+  items = parser.read(csv_path)
+  Record = namedtuple("HlyDelayRec", "DT_EST AvgDelay Cnt")
+  recs = []
+  for item in items:
+    dt_str = f'{item.DateEST} {item.HourEST}:30:00'
+    recs.append(Record(dt_str, item.AvgDelay, item.Cnt))
+  return recs
+
+
+def query_delays_hourly(routeId, stopName):
+  if not routeId:
+    routeId = 'ALLROUTES'
+  if not stopName:
+    stopName = 'ALLSTOPS'
+  
+  if StaticData:
+    recs = _get_delays_hourly_static(routeId, stopName)
+  else:
+    recs = _get_delays_hourly_db(routeId, stopName)
   if len(recs) < 2:
     return []
 

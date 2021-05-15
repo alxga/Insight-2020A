@@ -26,6 +26,8 @@ class Settings:
       be considered obsolete and to be stored compressed in S3
     NumPartitions: used in Spark tasks to partition dataframe
     ConsoleLogger: A logger writing to console
+    StaticDataPath: Path to static data in CSV local files (if they exist);
+      when set, indicates that only the data from those files should be used
   """
 
   def __init__(self):
@@ -55,6 +57,10 @@ class Settings:
     handler.setFormatter(logging.Formatter("%(message)s"))
     self.ConsoleLogger.addHandler(handler)
     self.ConsoleLogger.setLevel(logging.INFO)
+
+    static_path = os.path.join(self.ProjPath, 'HlyDelays0-CSV')
+    if os.path.exists(static_path):
+      self.StaticDataPath = static_path
 
 
 Settings = Settings()

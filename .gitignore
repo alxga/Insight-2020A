@@ -5,6 +5,7 @@ TripUpdates/
 csv-mbta-VehiclePos/
 mbta-VehiclePos/
 MBTA_GTFS/
+HlyDelays*/
 __pycache__/
 venv*/
 .vs/

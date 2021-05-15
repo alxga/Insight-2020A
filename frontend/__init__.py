@@ -3,19 +3,24 @@
 # pylint: disable=invalid-name
 # pylint: disable=usused-variable
 
-import os
-from flask import Flask, request, current_app, url_for, redirect
+from flask import Flask, url_for, redirect
 from flask_bootstrap import Bootstrap
+from common import Settings
+from .staticdata import init_static_data
 
 __author__ = "Alex Ganin"
 
 
 bootstrap = Bootstrap()
 
+
 def create_app():
   app = Flask(__name__)
 
   bootstrap.init_app(app)
+
+  if Settings.StaticDataPath:
+    init_static_data(Settings.StaticDataPath)
 
   from .mbta import bp as mbta_bp
   app.register_blueprint(mbta_bp, url_prefix="/mbta")
