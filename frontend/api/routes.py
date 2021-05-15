@@ -6,11 +6,10 @@ from flask import jsonify, request, Response
 from boto3.dynamodb.conditions import Key
 
 from common import Settings
-if not Settings.StaticDataPath:
+from ..staticdata import StaticData, CsvParser
+if not StaticData:
   from common.queryutils import DBConn
   from common.dyndb import DynDBMgr
-else:
-  from ..staticdata import StaticData, CsvParser
 from .. import math
 from . import bp
 

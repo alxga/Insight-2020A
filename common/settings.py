@@ -61,6 +61,8 @@ class Settings:
     static_path = os.path.join(self.ProjPath, 'HlyDelays0-CSV')
     if os.path.exists(static_path):
       self.StaticDataPath = static_path
+    else:
+      self.StaticDataPath = None
 
 
 Settings = Settings()
